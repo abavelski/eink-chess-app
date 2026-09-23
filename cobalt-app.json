@@ -1,0 +1,10 @@
+{
+  "id": "eink-chess",
+  "display_name": "E-Ink Chess",
+  "short_label": "Chess",
+  "summary": "Use your Kobo as a simple touch chessboard.",
+  "version": "0.1.0",
+  "release_notes": "Initial physical-board prototype.",
+  "glyph": "grid",
+  "capabilities": []
+}

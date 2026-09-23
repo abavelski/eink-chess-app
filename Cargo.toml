@@ -1,0 +1,9 @@
+[package]
+name = "eink-chess-app"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85.1"
+publish = false
+
+[dependencies]
+kobo-sdk = { git = "https://github.com/BandarLabs/Cobalt.git", rev = "026ac5561add0157109dd98592272ce9c6eb9343" }
