@@ -6,6 +6,8 @@ use std::process::ExitCode;
 
 const SIDE: usize = 8;
 const CELLS: usize = SIDE * SIDE;
+const RESET: &str = "reset";
+const EXIT: &str = "exit";
 
 #[derive(Default)]
 struct ChessBoardApp {
@@ -32,8 +34,9 @@ impl ChessBoardApp {
 
         ScreenBuilder::new("chessboard")
             .top_bar("E-Ink Chess")
-            .top_bar_action("reset", "Reset")
+            .top_bar_action(RESET, "Reset")
             .board_with_selection(SIDE as u8, cells)
+            .bottom_action(EXIT, "Return to Kobo reader")
             .build()
     }
 }
@@ -44,7 +47,12 @@ impl KoboApp for ChessBoardApp {
     }
 
     fn on_action(&mut self, context: &mut Context, action: ActionId) {
-        if action == action_id("reset") {
+        if action == action_id(EXIT) {
+            context.exit();
+            return;
+        }
+
+        if action == action_id(RESET) {
             self.board.reset();
             self.show(context);
             return;

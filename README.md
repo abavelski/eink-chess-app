@@ -4,7 +4,11 @@ A deliberately tiny Rust experiment for using an e-reader as a physical chessboa
 
 New to Rust? Start with **[Local development setup](docs/LOCAL_SETUP.md)**.
 
+For the Kobo runtime/launch design, see **[Kobo launch architecture](docs/KOBO_ARCHITECTURE.md)**.
+
 To install on a connected Kobo, follow **[USB device installation](docs/DEVICE_INSTALL.md)**.
+If the reader already has the older `NickelMenu -> Cobalt -> Chess` build,
+follow **[Update to direct launch](docs/DEVICE_UPDATE_DIRECT_LAUNCH.md)**.
 
 The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine and no chess rules yet.
 
@@ -17,6 +21,7 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - touch the selected piece again to deselect it
 - moving onto another piece simply replaces it
 - reset back to the starting position
+- return cleanly to the Kobo reader
 
 That is intentional: version 0.1 behaves like a physical board, not a chess game.
 
@@ -33,11 +38,21 @@ src/main.rs
     board rendering + touch actions
           |
           v
-Cobalt runtime
+Cobalt runtime (kobod)
           |
           v
 Kobo Libra H2O
 ```
+
+On the device, the normal owner-facing path is:
+
+```text
+NickelMenu -> E-Ink Chess -> chessboard
+```
+
+The Cobalt launcher is skipped. Cobalt remains underneath as the runtime that
+takes over/restores Nickel, handles touch/framebuffer access, and performs
+e-ink rendering.
 
 Keeping the board model platform-neutral means a future Slint/Kindle frontend can reuse it.
 
@@ -78,8 +93,9 @@ The simulator is the quickest place to verify board sizing and touch behavior be
 
 ## Next milestones
 
-1. Verify the board in the Cobalt simulator.
-2. Deploy it to the Libra H2O and check touch coordinates / refresh quality.
-3. Add board flipping.
+1. Improve the chess-piece artwork.
+2. Add board flipping.
+3. Keep the direct NickelMenu launch/update path reproducible.
 4. Replace the physical-board model only when needed with chess rules/FEN/PGN support.
 5. Add a Slint frontend for desktop + Kindle while reusing the pure Rust board core.
+6. Optionally explore a fully standalone Kobo backend after the study UI is mature.

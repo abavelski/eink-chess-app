@@ -4,6 +4,18 @@ These steps use the Cobalt SDK revision pinned by this app. They install Cobalt
 and E-Ink Chess together. The reader needs NickelMenu, a charged battery, and
 a data-capable USB cable. No Wi-Fi or SSH is needed.
 
+Cobalt remains the hardware/runtime layer, but the installed owner-facing path
+is direct:
+
+```text
+NickelMenu -> E-Ink Chess -> chessboard
+```
+
+The Cobalt application launcher is skipped.
+
+If you already have the earlier `NickelMenu -> Cobalt -> Chess` build installed,
+use [Update an existing Kobo to direct E-Ink Chess launch](DEVICE_UPDATE_DIRECT_LAUNCH.md).
+
 ## One-time setup on this Mac
 
 The Cobalt checkout belongs beside this repository:
@@ -25,7 +37,9 @@ brew install messense/macos-cross-toolchains/armv7-unknown-linux-musleabihf
 ```
 
 Prepare the local Cobalt checkout. This copies the current chess source into
-its workspace and registers Chess in its device package and launcher metadata:
+its workspace, registers Chess in its device package, points Cobalt's packaged
+panel session at Chess instead of the Cobalt launcher, and changes the generated
+NickelMenu entry to **E-Ink Chess**:
 
 ```sh
 cd /Users/aba/dev/eink-chess-app
@@ -43,7 +57,7 @@ cannot find it, reopen Terminal or add that directory to your `PATH`.
 On the Kobo, accept the **Connect** prompt. Check that `/Volumes/KOBOeReader`
 appears on the Mac. The reader should show its USB connection screen.
 
-From the Cobalt checkout, preview the install:
+From the prepared Cobalt checkout, preview the install:
 
 ```sh
 cd /Users/aba/dev/Cobalt
@@ -57,10 +71,10 @@ kobo setup --volume /Volumes/KOBOeReader --source --no-eject --no-sample
 ```
 
 Confirm the prompt. This builds ARM binaries, writes Cobalt and Chess to
-`.adds/cobalt` on the reader, verifies the copied files, and adds a Cobalt
-NickelMenu entry. It preserves the existing NickelMenu entries and KOReader.
-This revision's device package also includes Cobalt's bundled apps. The first
-build can take several minutes.
+`.adds/cobalt` on the reader, verifies the copied files, and writes an
+**E-Ink Chess** NickelMenu entry. It preserves existing unrelated NickelMenu
+entries and KOReader. This revision's device package still contains Cobalt's
+bundled apps; they are simply not in the normal Chess launch path.
 
 Cobalt setup also enables the reader's `ForceWifiOn` developer setting and sets
 its automatic sleep timer to 90 minutes. It leaves the firmware SSH server
@@ -74,29 +88,53 @@ diskutil eject /Volumes/KOBOeReader
 ```
 
 Unplug the cable. Power the Kobo completely off and back on, then leave it at
-the home screen for about one minute so NickelMenu completes its startup. Open
-NickelMenu (usually the bottom-right menu), choose **Cobalt**, then **Chess**.
+the home screen for about one minute so NickelMenu completes its startup.
+
+Open NickelMenu (usually the bottom-right menu) and choose **E-Ink Chess**.
+Cobalt may briefly show its takeover splash while it stops Nickel, then the
+chessboard should open directly. There is no Cobalt launcher selection step.
+
+To leave the app, tap **Return to Kobo reader** at the bottom of the chess
+screen. Closing the root Chess app ends the Cobalt panel session and restores
+Nickel.
 
 ## Install an updated version of this app later
 
-Connect the reader again, then from this repository:
+Because the preparation script patches one exact Cobalt source revision, reset
+the local Cobalt checkout before each new device package:
 
 ```sh
+cd /Users/aba/dev/Cobalt
+git reset --hard 026ac5561add0157109dd98592272ce9c6eb9343
+```
+
+Then:
+
+```sh
+cd /Users/aba/dev/eink-chess-app
 python3 scripts/prepare_cobalt.py ../Cobalt
+
 cd ../Cobalt
+cargo test -p kobo-eink-chess
+cargo install --path crates/kobo-cli --force
+
 kobo setup --volume /Volumes/KOBOeReader --source --no-eject --no-sample
 diskutil eject /Volumes/KOBOeReader
 ```
 
-Unplug and restart the reader. The preparation script is safe to run again: it
-refreshes the copied Rust files without adding duplicate registry entries.
-The Cobalt checkout must remain at the pinned commit. A normal Cobalt platform
-update may replace this custom device package, so repeat these steps if Chess
-disappears after updating Cobalt.
+Unplug and restart the reader.
 
-## If the Cobalt menu entry is missing
+See [Update an existing Kobo to direct E-Ink Chess launch](DEVICE_UPDATE_DIRECT_LAUNCH.md)
+for a more detailed step-by-step update/checklist.
+
+## If the E-Ink Chess menu entry is missing
 
 First check that NickelMenu itself still works. If a firmware update removed
 its plugin, reconnect the reader and run the setup command with `--menu` to
-stage NickelMenu again, then eject and restart. See Cobalt's
-`docs/INSTALL.md` in the sibling checkout for recovery details.
+stage NickelMenu again, then eject and restart. See Cobalt's `docs/INSTALL.md`
+in the sibling checkout for recovery details.
+
+If NickelMenu works but still shows **Cobalt** instead of **E-Ink Chess**, make
+sure the Cobalt checkout was reset to the pinned commit and then prepared with
+this repository's `scripts/prepare_cobalt.py` before reinstalling the `kobo`
+CLI and running `kobo setup --source`.
