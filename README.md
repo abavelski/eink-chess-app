@@ -4,6 +4,8 @@ A deliberately tiny Rust experiment for using an e-reader as a physical chessboa
 
 New to Rust? Start with **[Local development setup](docs/LOCAL_SETUP.md)**.
 
+To install on a connected Kobo, follow **[USB device installation](docs/DEVICE_INSTALL.md)**.
+
 The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine and no chess rules yet.
 
 ## MVP
