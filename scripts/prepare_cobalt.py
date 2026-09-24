@@ -39,6 +39,15 @@ def replace_once(path: Path, old: str, new: str) -> None:
     path.write_text(text.replace(old, new, 1))
 
 
+def insert_before(path: Path, anchor: str, addition: str) -> None:
+    text = path.read_text()
+    if addition in text:
+        return
+    if text.count(anchor) != 1:
+        raise SystemExit(f"Cannot find one insertion point in {path}")
+    path.write_text(text.replace(anchor, addition + anchor, 1))
+
+
 if not (COBALT / "Cargo.toml").is_file():
     raise SystemExit(f"Cobalt checkout not found at {COBALT}")
 revision = subprocess.check_output(
@@ -104,6 +113,115 @@ replace_once(
     COBALT / "crates" / "kobo-cli" / "src" / "menu.rs",
     'menu_item :main :Cobalt :cmd_spawn :quiet:{}',
     'menu_item :main :E-Ink Chess :cmd_spawn :quiet:{}',
+)
+
+# Keep the board mark change in Cobalt's board layout, where the cell geometry
+# is known. Other grid and tile icons retain their existing 3/5 size.
+replace_once(
+    COBALT / "crates" / "kobo-ui" / "src" / "lib.rs",
+    '                        Some(glyph) => {\n'
+    '                            let mark = min(cell_height, cell_width) * 3 / 5;\n',
+    '                        Some(glyph) => {\n'
+    '                            // Chess pieces use more of their square while\n'
+    '                            // retaining a safe margin from the border.\n'
+    '                            let mark = if chess_board {\n'
+    '                                min(cell_height, cell_width) * 4 / 5\n'
+    '                            } else {\n'
+    '                                min(cell_height, cell_width) * 3 / 5\n'
+    '                            };\n',
+)
+
+# The imported chess paths contain closed body contours and open detail
+# strokes. Shape::Fill closes each contour during rasterisation, so filling
+# these paths gives black pieces a solid silhouette without inventing a second
+# chess drawing or using an oversized stroke. White pieces continue through
+# the normal Tabler outline path. Keep this branch chess-specific: unrelated
+# Cobalt glyphs retain their normal outline rendering.
+replace_once(
+    COBALT / "crates" / "kobo-ui" / "src" / "vector.rs",
+    '    if let Some(shapes) = game_piece_shapes(glyph) {\n'
+    '        return shapes;\n'
+    '    }\n'
+    '    let width = if matches!(\n'
+    '        glyph,\n'
+    '        Glyph::ChessBlackKing\n'
+    '            | Glyph::ChessBlackQueen\n'
+    '            | Glyph::ChessBlackRook\n'
+    '            | Glyph::ChessBlackBishop\n'
+    '            | Glyph::ChessBlackKnight\n'
+    '            | Glyph::ChessBlackPawn\n'
+    '    ) {\n'
+    '        WEIGHT * 2\n'
+    '    } else {\n'
+    '        WEIGHT\n'
+    '    };\n'
+    '    tabler::outline(glyph)\n'
+    '        .iter()\n'
+    '        .map(|commands| Shape::Stroke {\n'
+    '            path: Path::from_commands(commands),\n'
+    '            width,\n'
+    '        })\n'
+    '        .collect()\n',
+    '    if let Some(shapes) = game_piece_shapes(glyph) {\n'
+    '        return shapes;\n'
+    '    }\n'
+    '    if matches!(\n'
+    '        glyph,\n'
+    '        Glyph::ChessBlackKing\n'
+    '            | Glyph::ChessBlackQueen\n'
+    '            | Glyph::ChessBlackRook\n'
+    '            | Glyph::ChessBlackBishop\n'
+    '            | Glyph::ChessBlackKnight\n'
+    '            | Glyph::ChessBlackPawn\n'
+    '    ) {\n'
+    '        // The chess source has closed body contours plus open detail\n'
+    '        // strokes. Fill closes each contour in the rasterizer, producing\n'
+    '        // a true black silhouette without the old oversized stroke.\n'
+    '        return tabler::outline(glyph)\n'
+    '            .iter()\n'
+    '            .map(|commands| Shape::Fill(Path::from_commands(commands)))\n'
+    '            .collect();\n'
+    '    }\n'
+    '    tabler::outline(glyph)\n'
+    '        .iter()\n'
+    '        .map(|commands| Shape::Stroke {\n'
+    '            path: Path::from_commands(commands),\n'
+    '            width: WEIGHT,\n'
+    '        })\n'
+    '        .collect()\n',
+)
+
+# Add a renderer-level regression test beside Cobalt's existing chess tests.
+# It checks solid interior coverage rather than relying on a screenshot.
+insert_before(
+    COBALT / "crates" / "kobo-ui" / "src" / "vector.rs",
+    '    #[test]\n    fn chess_pieces_are_vector_art_with_distinct_sides() {',
+    '    #[test]\n'
+    '    fn black_chess_pieces_have_filled_interiors() {\n'
+    '        for (white, black) in [\n'
+    '            (Glyph::ChessWhiteKing, Glyph::ChessBlackKing),\n'
+    '            (Glyph::ChessWhiteQueen, Glyph::ChessBlackQueen),\n'
+    '            (Glyph::ChessWhiteRook, Glyph::ChessBlackRook),\n'
+    '            (Glyph::ChessWhiteBishop, Glyph::ChessBlackBishop),\n'
+    '            (Glyph::ChessWhiteKnight, Glyph::ChessBlackKnight),\n'
+    '            (Glyph::ChessWhitePawn, Glyph::ChessBlackPawn),\n'
+    '        ] {\n'
+    '            let white_solid = render(&shapes(white), 96)\n'
+    '                .alpha\n'
+    '                .iter()\n'
+    '                .filter(|&&value| value == 255)\n'
+    '                .count();\n'
+    '            let black_solid = render(&shapes(black), 96)\n'
+    '                .alpha\n'
+    '                .iter()\n'
+    '                .filter(|&&value| value == 255)\n'
+    '                .count();\n'
+    '            assert!(\n'
+    '                black_solid > white_solid,\n'
+    '                "{black:?} has no filled interior: {black_solid} <= {white_solid}"\n'
+    '            );\n'
+    '        }\n'
+    '    }\n\n',
 )
 
 print(f"Prepared {destination} for direct NickelMenu launch through Cobalt")

@@ -92,6 +92,16 @@ The stable `.adds/cobalt-launch.sh` bootstrap is intentionally retained. It is
 part of Cobalt's safe installation/recovery path and avoids duplicating that
 logic in this project.
 
+### Chess presentation patch
+
+Cobalt still supplies the board layout, vector rasterizer, touch handling, and
+e-ink refresh infrastructure. The integration script applies the project's
+small chess presentation patch inside the pinned Cobalt checkout: chess pieces
+occupy about 80% of their board square, white pieces remain outline glyphs, and
+black pieces use the same Tabler contours as filled silhouettes. This keeps the
+visual policy in the Cobalt UI adapter and leaves `src/board.rs` as pure board
+state.
+
 ## Architecture B — fully standalone Kobo application
 
 This is a possible future learning project, not the current implementation.
