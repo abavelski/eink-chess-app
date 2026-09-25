@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-PINNED_COBALT = "026ac5561add0157109dd98592272ce9c6eb9343"
+PINNED_COBALT = "ac98e6dbc67007776a747becc31865e32e1e01e2"
 APP = Path(__file__).resolve().parents[1]
 COBALT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else APP.parent / "Cobalt"
 
@@ -60,6 +60,13 @@ destination = COBALT / "examples" / "eink-chess"
 (destination / "src").mkdir(parents=True, exist_ok=True)
 for name in ("main.rs", "board.rs"):
     shutil.copy2(APP / "src" / name, destination / "src" / name)
+main = destination / "src" / "main.rs"
+main.write_text(
+    main.read_text().replace(
+        'include_str!("../examples/positions.fen")',
+        'include_str!("positions.fen")',
+    )
+)
 shutil.copy2(APP / "examples" / "positions.fen", destination / "src" / "positions.fen")
 (destination / "Cargo.toml").write_text(
     '[package]\n'

@@ -4,7 +4,7 @@ set -euo pipefail
 # Build and install E-Ink Chess on a mounted Kobo Libra H2O.
 #
 # The Cobalt checkout is intentionally kept outside this repository because it
-# is a pinned upstream dependency. This script prepares it from the app source,
+# is a pinned fork dependency. This script prepares it from the app source,
 # builds the ARM package, installs it over USB, verifies the installed chess
 # binary, and ejects the reader only after every check succeeds.
 
@@ -26,8 +26,8 @@ command -v diskutil >/dev/null || fail "diskutil is required on macOS"
 [[ -f "${VOLUME}/.kobo/version" ]] || fail "${VOLUME} is not a Kobo volume"
 [[ -f "${COBALT_DIR}/Cargo.toml" ]] || fail "Cobalt checkout not found at ${COBALT_DIR}"
 
-if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "026ac5561add0157109dd98592272ce9c6eb9343" ]]; then
-    fail "Cobalt is not at the pinned revision 026ac5561add0157109dd98592272ce9c6eb9343"
+if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "ac98e6dbc67007776a747becc31865e32e1e01e2" ]]; then
+    fail "Cobalt is not at the pinned revision ac98e6dbc67007776a747becc31865e32e1e01e2"
 fi
 
 printf '%s\n' 'Preparing pinned Cobalt with the current E-Ink Chess sources…'
