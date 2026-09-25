@@ -6,4 +6,4 @@ rust-version = "1.85.1"
 publish = false
 
 [dependencies]
-kobo-sdk = { git = "https://github.com/abavelski/Cobalt.git", rev = "ecbe828da2ba163437ddd1e870079f5d41a5d2dd" }
+kobo-sdk = { git = "https://github.com/abavelski/Cobalt.git", rev = "b0c1160d87fe438f297e21a917867baad6316b55" }

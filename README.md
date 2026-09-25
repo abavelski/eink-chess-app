@@ -70,7 +70,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-ecbe828da2ba163437ddd1e870079f5d41a5d2dd
+b0c1160d87fe438f297e21a917867baad6316b55
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This
