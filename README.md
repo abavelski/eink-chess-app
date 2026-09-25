@@ -15,15 +15,24 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 ## MVP
 
 - 8×8 board
-- normal starting position
+- load positions from standard FEN notation
+- browse saved positions with the Kobo page-turn buttons
 - touch a piece to select it
 - touch any square to move it
 - touch the selected piece again to deselect it
 - moving onto another piece simply replaces it
-- reset back to the starting position
+- reset the board to the current FEN position
 - return cleanly to the Kobo reader
 
-That is intentional: version 0.1 behaves like a physical board, not a chess game.
+That is intentional: version 0.1 behaves like a physical board and position
+viewer, not a chess game. It does not enforce legal moves or play turns.
+
+On first launch, the app creates `.adds/cobalt/state/eink-chess/positions.fen`
+from the ten positions in [examples/positions.fen](examples/positions.fen).
+Edit that file over USB while the app is closed. Put one six-field FEN position
+on each line; blank lines and lines starting with `#` are ignored. Forward and
+back page-turn buttons move through the list, and **Reset** restores the
+position for the current FEN line.
 
 ## Architecture
 
@@ -64,7 +73,11 @@ This project pins the Cobalt SDK to commit:
 026ac5561add0157109dd98592272ce9c6eb9343
 ```
 
-Cobalt already provides the parts this prototype needs: an 8×8 touch board, partial e-ink refresh planning, and built-in monochrome chess piece glyphs.
+Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This
+project adds the public-domain [Sashité Western chess pieces](https://sashite.dev/assets/chess/),
+a coordinate frame, and 80%-square piece sizing through its pinned Cobalt patch.
+Board lines use a uniform gray rule and the frame around the playable squares
+uses a thinner black line.
 
 ### Install the Cobalt CLI
 
@@ -93,9 +106,8 @@ The simulator is the quickest place to verify board sizing and touch behavior be
 
 ## Next milestones
 
-1. Improve the chess-piece artwork.
-2. Add board flipping.
-3. Keep the direct NickelMenu launch/update path reproducible.
-4. Replace the physical-board model only when needed with chess rules/FEN/PGN support.
-5. Add a Slint frontend for desktop + Kindle while reusing the pure Rust board core.
-6. Optionally explore a fully standalone Kobo backend after the study UI is mature.
+1. Add board flipping.
+2. Keep the direct NickelMenu launch/update path reproducible.
+3. Add optional chess rules and PGN support.
+4. Add a Slint frontend for desktop + Kindle while reusing the pure Rust board core.
+5. Optionally explore a fully standalone Kobo backend after the study UI is mature.

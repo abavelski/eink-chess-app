@@ -68,7 +68,7 @@ currently supplies:
 - application lifecycle and supervision;
 - safe handoff back to Nickel;
 - Cobalt screen/layout primitives;
-- built-in chess glyphs used by the current MVP;
+- the renderer used for the chess-specific SVG artwork;
 - simulator and device tooling.
 
 The app now has a pinned **Return to Kobo reader** action. It calls
@@ -81,7 +81,8 @@ The application repository itself stays independent of a modified Cobalt fork.
 `scripts/prepare_cobalt.py` applies the small integration to the pinned Cobalt
 checkout before a device package is built. At the pinned Cobalt revision it:
 
-1. copies `src/main.rs` and `src/board.rs` into a Cobalt workspace example;
+1. copies `src/main.rs`, `src/board.rs`, and the bundled FEN examples into a
+   Cobalt workspace example;
 2. registers `kobo-eink-chess` in the device package;
 3. registers the app metadata used by Cobalt;
 4. changes Cobalt's packaged `start.sh` root app from `kobo-launcher` to
@@ -96,11 +97,21 @@ logic in this project.
 
 Cobalt still supplies the board layout, vector rasterizer, touch handling, and
 e-ink refresh infrastructure. The integration script applies the project's
-small chess presentation patch inside the pinned Cobalt checkout: chess pieces
-occupy about 80% of their board square, white pieces remain outline glyphs, and
-black pieces use the same Tabler contours as filled silhouettes. This keeps the
-visual policy in the Cobalt UI adapter and leaves `src/board.rs` as pure board
-state.
+chess presentation patch inside the pinned Cobalt checkout. It renders the
+12 Sashité Western SVG pieces with their original light and dark layers,
+keeps each piece at 80% of its square, and adds a frame with file and rank
+coordinates. The playable squares are sized to the panel and the lines use a
+uniform gray rule; a thinner black rule surrounds the board. The 64 squares
+retain their touch actions. The source SVGs and their generated vector paths
+live in `assets/sashite-western`; the integration script applies
+`patches/cobalt-ui.patch`. `src/board.rs` remains pure board state and parses
+standard six-field FEN positions.
+
+The app's FEN list is kept in Cobalt's durable per-app store as
+`.adds/cobalt/state/eink-chess/positions.fen`. The first launch copies the ten
+bundled positions there. The file contains one FEN per line and can be edited
+over USB while the app is closed. The reader's physical page-turn buttons move
+through the saved positions; **Reset** restores the current line's FEN.
 
 ## Architecture B — fully standalone Kobo application
 

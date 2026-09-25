@@ -28,6 +28,7 @@ pub struct Piece {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Board {
     squares: [Option<Piece>; 64],
+    starting_squares: [Option<Piece>; 64],
     selected: Option<usize>,
 }
 
@@ -73,12 +74,139 @@ impl Board {
 
         Self {
             squares,
+            starting_squares: squares,
             selected: None,
         }
     }
 
+    /// Build a board from a standard six-field FEN position.
+    ///
+    /// The app does not enforce chess move rules, so the FEN metadata is
+    /// validated but only the piece placement is used for drawing.
+    pub fn from_fen(fen: &str) -> Result<Self, &'static str> {
+        let fields: Vec<_> = fen.split_ascii_whitespace().collect();
+        if fields.len() != 6 {
+            return Err("FEN must contain six fields");
+        }
+
+        let ranks: Vec<_> = fields[0].split('/').collect();
+        if ranks.len() != 8 {
+            return Err("FEN piece placement must contain eight ranks");
+        }
+
+        let mut squares = [None; 64];
+        for (rank_index, rank) in ranks.iter().enumerate() {
+            let mut file = 0usize;
+            for symbol in rank.chars() {
+                if ('1'..='8').contains(&symbol) {
+                    file += symbol.to_digit(10).expect("ASCII digit") as usize;
+                    if file > 8 {
+                        return Err("FEN rank contains more than eight squares");
+                    }
+                    continue;
+                }
+
+                let piece = match symbol {
+                    'P' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::Pawn,
+                    },
+                    'N' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::Knight,
+                    },
+                    'B' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::Bishop,
+                    },
+                    'R' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::Rook,
+                    },
+                    'Q' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::Queen,
+                    },
+                    'K' => Piece {
+                        color: Color::White,
+                        kind: PieceKind::King,
+                    },
+                    'p' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::Pawn,
+                    },
+                    'n' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::Knight,
+                    },
+                    'b' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::Bishop,
+                    },
+                    'r' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::Rook,
+                    },
+                    'q' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::Queen,
+                    },
+                    'k' => Piece {
+                        color: Color::Black,
+                        kind: PieceKind::King,
+                    },
+                    _ => return Err("FEN contains an unknown piece symbol"),
+                };
+                if file >= 8 {
+                    return Err("FEN rank contains more than eight squares");
+                }
+                squares[rank_index * 8 + file] = Some(piece);
+                file += 1;
+            }
+            if file != 8 {
+                return Err("each FEN rank must describe exactly eight squares");
+            }
+        }
+
+        if !matches!(fields[1], "w" | "b") {
+            return Err("FEN active color must be w or b");
+        }
+        if fields[2] != "-" {
+            let mut seen = String::new();
+            for right in fields[2].chars() {
+                if !matches!(right, 'K' | 'Q' | 'k' | 'q') || seen.contains(right) {
+                    return Err("FEN castling rights are invalid");
+                }
+                seen.push(right);
+            }
+        }
+        if fields[3] != "-" {
+            let bytes = fields[3].as_bytes();
+            let expected_rank = if fields[1] == "w" { b'6' } else { b'3' };
+            if bytes.len() != 2 || !(b'a'..=b'h').contains(&bytes[0]) || bytes[1] != expected_rank {
+                return Err("FEN en passant square is invalid for the active color");
+            }
+        }
+        fields[4]
+            .parse::<u32>()
+            .map_err(|_| "FEN halfmove clock must be a nonnegative integer")?;
+        let fullmove = fields[5]
+            .parse::<u32>()
+            .map_err(|_| "FEN fullmove number must be a positive integer")?;
+        if fullmove == 0 {
+            return Err("FEN fullmove number must be a positive integer");
+        }
+
+        Ok(Self {
+            squares,
+            starting_squares: squares,
+            selected: None,
+        })
+    }
+
     pub fn reset(&mut self) {
-        *self = Self::starting_position();
+        self.squares = self.starting_squares;
+        self.selected = None;
     }
 
     pub const fn selected(&self) -> Option<usize> {
