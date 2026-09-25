@@ -4,9 +4,10 @@ set -euo pipefail
 # Build and install E-Ink Chess on a mounted Kobo Libra H2O.
 #
 # The Cobalt checkout is intentionally kept outside this repository because it
-# is a pinned fork dependency. This script prepares it from the app source,
-# builds the ARM package, installs it over USB, verifies the installed chess
-# binary, and ejects the reader only after every check succeeds.
+# is a pinned fork dependency. This script prepares and prebuilds everything
+# before it needs the Kobo, waits for the reader only when deployment is ready,
+# installs over USB, verifies the installed chess binary, and leaves the reader
+# mounted for fast development/test iterations.
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COBALT_DIR="${COBALT_DIR:-${APP_DIR}/../Cobalt}"
@@ -20,10 +21,7 @@ fail() {
 
 command -v python3 >/dev/null || fail "python3 is required"
 command -v rustup >/dev/null || fail "rustup is required"
-command -v diskutil >/dev/null || fail "diskutil is required on macOS"
 
-[[ -d "${VOLUME}" ]] || fail "Kobo volume is not mounted at ${VOLUME}"
-[[ -f "${VOLUME}/.kobo/version" ]] || fail "${VOLUME} is not a Kobo volume"
 [[ -f "${COBALT_DIR}/Cargo.toml" ]] || fail "Cobalt checkout not found at ${COBALT_DIR}"
 
 if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "b9f46f21af1e209af3c4030e7af90a20c722395c" ]]; then
@@ -52,7 +50,32 @@ printf '%s\n' 'Installing the prepared Cobalt CLI…'
 KOBO_BIN="${KOBO_BIN:-${HOME}/.cargo/bin/kobo}"
 [[ -x "${KOBO_BIN}" ]] || fail "prepared kobo CLI not found at ${KOBO_BIN}"
 
-printf '%s\n' 'Building and installing the ARM package on the Kobo…'
+# Build the complete device package before requiring the Kobo to be mounted.
+# `kobo setup --source` below performs the same package build internally, but
+# Cargo will then hit the warm target directory instead of doing the expensive
+# ARM compilation while the USB volume has to remain connected.
+PREBUILT_PACKAGE="${COBALT_DIR}/target/eink-chess-KoboRoot.tgz"
+printf '%s\n' 'Prebuilding the complete Kobo package before USB deployment…'
+(
+    cd "${COBALT_DIR}"
+    PATH="$(dirname "$(rustup which cargo --toolchain "${PINNED_TOOLCHAIN}")"):${PATH}" \
+        RUSTUP_TOOLCHAIN="${PINNED_TOOLCHAIN}" \
+        "${KOBO_BIN}" package --out "${PREBUILT_PACKAGE}"
+)
+[[ -f "${PREBUILT_PACKAGE}" ]] || fail "prebuilt Kobo package was not produced"
+
+printf 'Build complete. Connect the Kobo and tap Connect; waiting for %s…\n' "${VOLUME}"
+WAIT_SECONDS="${KOBO_WAIT_SECONDS:-600}"
+WAIT_DEADLINE=$((SECONDS + WAIT_SECONDS))
+while [[ ! -f "${VOLUME}/.kobo/version" ]]; do
+    if (( SECONDS >= WAIT_DEADLINE )); then
+        fail "Kobo did not mount at ${VOLUME} within ${WAIT_SECONDS} seconds"
+    fi
+    sleep 2
+done
+printf '%s\n' 'Kobo mounted; starting the short USB deployment step…'
+
+printf '%s\n' 'Installing the ARM package on the Kobo…'
 (
     cd "${COBALT_DIR}"
     PATH="$(dirname "$(rustup which cargo --toolchain "${PINNED_TOOLCHAIN}")"):${PATH}" \
@@ -61,6 +84,7 @@ printf '%s\n' 'Building and installing the ARM package on the Kobo…'
             --volume "${VOLUME}" \
             --source \
             --no-eject \
+            --wait-for-reader \
             --no-sample \
             --yes
 )
@@ -82,5 +106,5 @@ grep -q 'kobo-eink-chess' "${START_FILE}" || fail "Cobalt is not configured to l
 
 printf 'Installed ARM chess binary (%s)\n' "${EXPECTED_HASH}"
 printf '%s\n' 'E-Ink Chess menu and direct-launch checks passed.'
-diskutil eject "${VOLUME}"
-printf '%s\n' 'Kobo safely ejected. Disconnect USB and restart the reader.'
+printf 'Kobo left mounted at %s for inspection/repeated deploys.\n' "${VOLUME}"
+printf '%s\n' 'Eject it manually when you are ready to disconnect and test on-device.'
