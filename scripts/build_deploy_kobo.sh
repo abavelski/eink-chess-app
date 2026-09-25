@@ -26,8 +26,8 @@ command -v diskutil >/dev/null || fail "diskutil is required on macOS"
 [[ -f "${VOLUME}/.kobo/version" ]] || fail "${VOLUME} is not a Kobo volume"
 [[ -f "${COBALT_DIR}/Cargo.toml" ]] || fail "Cobalt checkout not found at ${COBALT_DIR}"
 
-if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "d37d2238134b234b84512a06c8cfc16d7f25df9a" ]]; then
-    fail "Cobalt is not at the pinned revision d37d2238134b234b84512a06c8cfc16d7f25df9a"
+if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "ecbe828da2ba163437ddd1e870079f5d41a5d2dd" ]]; then
+    fail "Cobalt is not at the pinned revision ecbe828da2ba163437ddd1e870079f5d41a5d2dd"
 fi
 
 printf '%s\n' 'Preparing pinned Cobalt with the current E-Ink Chess sources…'

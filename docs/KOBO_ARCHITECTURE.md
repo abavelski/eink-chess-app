@@ -93,19 +93,18 @@ The stable `.adds/cobalt-launch.sh` bootstrap is intentionally retained. It is
 part of Cobalt's safe installation/recovery path and avoids duplicating that
 logic in this project.
 
-### Chess presentation patch
+### Chess presentation
 
 Cobalt still supplies the board layout, vector rasterizer, touch handling, and
-e-ink refresh infrastructure. The integration script applies the project's
-chess presentation patch inside the pinned Cobalt checkout. It renders the
-12 Sashité Western SVG pieces with their original light and dark layers,
+e-ink refresh infrastructure. The pinned Cobalt checkout includes the chess
+presentation changes. It renders the 12 Sashité Western SVG pieces with their
+original light and dark layers,
 keeps each piece at 80% of its square, and adds a frame with file and rank
-coordinates. The playable squares are sized to the panel and the lines use a
-uniform gray rule; a thinner black rule surrounds the board. The 64 squares
-retain their touch actions. The source SVGs and their generated vector paths
-live in `assets/sashite-western`; the integration script applies
-`patches/cobalt-ui.patch`. `src/board.rs` remains pure board state and parses
-standard six-field FEN positions.
+coordinates. The playable squares use 90% of their panel-fit size and the lines
+use a uniform gray rule; a thinner black rule surrounds the board. The 64
+squares retain their touch actions. The source SVGs and their generated vector
+paths live in `assets/sashite-western`. `src/board.rs` remains pure board state
+and parses standard six-field FEN positions.
 
 The app's FEN list is kept in Cobalt's durable per-app store as
 `.adds/cobalt/state/eink-chess/positions.fen`. The first launch copies the ten

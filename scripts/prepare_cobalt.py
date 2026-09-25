@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-PINNED_COBALT = "d37d2238134b234b84512a06c8cfc16d7f25df9a"
+PINNED_COBALT = "ecbe828da2ba163437ddd1e870079f5d41a5d2dd"
 APP = Path(__file__).resolve().parents[1]
 COBALT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else APP.parent / "Cobalt"
 
@@ -122,17 +122,5 @@ replace_once(
     'menu_item :main :Cobalt :cmd_spawn :quiet:{}',
     'menu_item :main :E-Ink Chess :cmd_spawn :quiet:{}',
 )
-
-# Apply the chess artwork and board-frame patch to the pinned Cobalt source.
-# A reverse check makes rerunning this script safe on an already prepared tree.
-patch = APP / "patches" / "cobalt-ui.patch"
-reverse = subprocess.run(
-    ["git", "-C", str(COBALT), "apply", "--reverse", "--check", str(patch)],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-if reverse.returncode != 0:
-    subprocess.run(["git", "-C", str(COBALT), "apply", "--check", str(patch)], check=True)
-    subprocess.run(["git", "-C", str(COBALT), "apply", str(patch)], check=True)
 
 print(f"Prepared {destination} for direct NickelMenu launch through Cobalt")

@@ -70,12 +70,12 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-026ac5561add0157109dd98592272ce9c6eb9343
+ecbe828da2ba163437ddd1e870079f5d41a5d2dd
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This
 project adds the public-domain [Sashité Western chess pieces](https://sashite.dev/assets/chess/),
-a coordinate frame, and 80%-square piece sizing through its pinned Cobalt patch.
+a coordinate frame, and 80%-square piece sizing through its pinned Cobalt fork.
 Board lines use a uniform gray rule and the frame around the playable squares
 uses a thinner black line.
 
