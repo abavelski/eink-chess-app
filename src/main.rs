@@ -75,10 +75,8 @@ impl ChessBoardApp {
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
-            .board_with_selection(SIDE as u8, cells);
-        if !self.sleeping {
-            screen = screen.buttons([(RESET, "Reset")]);
-        }
+            .board_with_selection(SIDE as u8, cells)
+            .buttons([(RESET, "Reset")]);
         if let Some(error) = self.file_error.as_ref() {
             screen = screen.text(error.clone());
         }
