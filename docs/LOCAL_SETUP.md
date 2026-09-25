@@ -218,7 +218,7 @@ Keep Cobalt in a separate checkout beside this repository:
 This project currently pins the Cobalt SDK to:
 
 ```text
-b9f46f21af1e209af3c4030e7af90a20c722395c
+6737d128b3110a79a8b25216c58995b5ddc4b37c
 ```
 
 For the smoothest development setup, install the CLI from the same revision:
@@ -229,7 +229,7 @@ cd ~/src
 git clone https://github.com/abavelski/Cobalt.git
 cd Cobalt
 
-git checkout b9f46f21af1e209af3c4030e7af90a20c722395c
+git checkout 6737d128b3110a79a8b25216c58995b5ddc4b37c
 ```
 
 Install Cobalt's `kobo` command:
@@ -396,7 +396,7 @@ cd ~/src
 
 git clone https://github.com/abavelski/Cobalt.git
 cd Cobalt
-git checkout b9f46f21af1e209af3c4030e7af90a20c722395c
+git checkout 6737d128b3110a79a8b25216c58995b5ddc4b37c
 
 cargo install --path crates/kobo-cli --force
 ```

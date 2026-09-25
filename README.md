@@ -70,7 +70,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-b9f46f21af1e209af3c4030e7af90a20c722395c
+6737d128b3110a79a8b25216c58995b5ddc4b37c
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This
@@ -84,7 +84,7 @@ uses a thinner black line.
 Clone Cobalt once and install its development CLI:
 
 ```sh
-git clone https://github.com/BandarLabs/Cobalt.git
+git clone https://github.com/abavelski/Cobalt.git
 cd Cobalt
 cargo install --path crates/kobo-cli
 ```

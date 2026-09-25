@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-PINNED_COBALT = "b9f46f21af1e209af3c4030e7af90a20c722395c"
+PINNED_COBALT = "6737d128b3110a79a8b25216c58995b5ddc4b37c"
 APP = Path(__file__).resolve().parents[1]
 COBALT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else APP.parent / "Cobalt"
 

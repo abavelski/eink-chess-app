@@ -7,6 +7,7 @@ use std::process::ExitCode;
 const SIDE: usize = 8;
 const CELLS: usize = SIDE * SIDE;
 const RESET: &str = "reset";
+const FLIP: &str = "flip";
 const EXIT: &str = "exit";
 const POSITIONS_FILE: &str = "positions.fen";
 const EXAMPLE_POSITIONS: &str = include_str!("../examples/positions.fen");
@@ -18,6 +19,7 @@ struct ChessBoardApp {
     position_index: usize,
     file_error: Option<String>,
     sleeping: bool,
+    flipped: bool,
 }
 
 impl ChessBoardApp {
@@ -51,11 +53,12 @@ impl ChessBoardApp {
     fn screen(&self) -> Screen {
         let selected = self.board.selected();
 
-        let cells = (0..CELLS).map(|square| {
+        let cells = (0..CELLS).map(|display_square| {
+            let square = board_square(display_square, self.flipped);
             let piece = self.board.piece_at(square);
             (
                 square_action(square),
-                piece.map(piece_label).unwrap_or(" "),
+                square_label(square, piece),
                 piece.map(piece_glyph),
                 selected == Some(square),
             )
@@ -76,7 +79,13 @@ impl ChessBoardApp {
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
             .board_with_selection(SIDE as u8, cells)
-            .buttons([(RESET, "Reset")]);
+            .controls(
+                2,
+                [
+                    (RESET, "Reset position", Glyph::Refresh),
+                    (FLIP, "Flip board", Glyph::Grid),
+                ],
+            );
         if let Some(error) = self.file_error.as_ref() {
             screen = screen.text(error.clone());
         }
@@ -155,6 +164,12 @@ impl KoboApp for ChessBoardApp {
             return;
         }
 
+        if action == action_id(FLIP) {
+            self.flipped = !self.flipped;
+            self.show(context);
+            return;
+        }
+
         for square in 0..CELLS {
             if action == action_id(&square_action(square)) {
                 // Avoid an e-ink refresh when a tap changed nothing.
@@ -201,6 +216,23 @@ fn square_action(square: usize) -> String {
     format!("square-{square}")
 }
 
+const fn board_square(display_square: usize, flipped: bool) -> usize {
+    if flipped {
+        CELLS - 1 - display_square
+    } else {
+        display_square
+    }
+}
+
+fn square_label(square: usize, piece: Option<Piece>) -> String {
+    let file = (b'a' + (square % SIDE) as u8) as char;
+    let rank = (b'8' - (square / SIDE) as u8) as char;
+    match piece {
+        Some(piece) => format!("{file}{rank} {}", piece_label(piece)),
+        None => format!("{file}{rank}"),
+    }
+}
+
 const fn piece_label(piece: Piece) -> &'static str {
     match (piece.color, piece.kind) {
         (Color::White, PieceKind::King) => "K",
@@ -232,6 +264,22 @@ const fn piece_glyph(piece: Piece) -> Glyph {
         (Color::Black, PieceKind::Bishop) => Glyph::ChessBlackBishop,
         (Color::Black, PieceKind::Knight) => Glyph::ChessBlackKnight,
         (Color::Black, PieceKind::Pawn) => Glyph::ChessBlackPawn,
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::{board_square, square_label, CELLS};
+
+    #[test]
+    fn flipped_display_reverses_board_and_algebraic_notation() {
+        assert_eq!(board_square(0, false), 0);
+        assert_eq!(board_square(CELLS - 1, false), CELLS - 1);
+        assert_eq!(board_square(0, true), CELLS - 1);
+        assert_eq!(board_square(CELLS - 1, true), 0);
+        assert_eq!(square_label(0, None), "a8");
+        assert_eq!(square_label(CELLS - 1, None), "h1");
     }
 }
 

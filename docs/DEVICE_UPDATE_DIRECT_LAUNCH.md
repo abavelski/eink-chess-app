@@ -49,7 +49,7 @@ known source.
 
 ```sh
 cd /Users/aba/dev/Cobalt
-git reset --hard b9f46f21af1e209af3c4030e7af90a20c722395c
+git reset --hard 6737d128b3110a79a8b25216c58995b5ddc4b37c
 ```
 
 This command discards local changes inside the Cobalt checkout. Do not run it
@@ -64,7 +64,7 @@ git rev-parse HEAD
 It should print:
 
 ```text
-b9f46f21af1e209af3c4030e7af90a20c722395c
+6737d128b3110a79a8b25216c58995b5ddc4b37c
 ```
 
 ## 3. Prepare Cobalt with E-Ink Chess as the root app
@@ -198,7 +198,7 @@ git pull
 cargo test
 
 cd /Users/aba/dev/Cobalt
-git reset --hard b9f46f21af1e209af3c4030e7af90a20c722395c
+git reset --hard 6737d128b3110a79a8b25216c58995b5ddc4b37c
 
 cd /Users/aba/dev/eink-chess-app
 python3 scripts/prepare_cobalt.py ../Cobalt
