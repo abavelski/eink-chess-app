@@ -24,7 +24,7 @@ The Cobalt checkout belongs beside this repository:
 cd /Users/aba/dev
 git clone https://github.com/abavelski/Cobalt.git
 cd Cobalt
-git checkout b0c1160d87fe438f297e21a917867baad6316b55
+git checkout b9f46f21af1e209af3c4030e7af90a20c722395c
 ```
 
 If `Cobalt` is already there at that revision, skip the clone. Install the ARM
@@ -105,7 +105,7 @@ the local Cobalt checkout before each new device package:
 
 ```sh
 cd /Users/aba/dev/Cobalt
-git reset --hard b0c1160d87fe438f297e21a917867baad6316b55
+git reset --hard b9f46f21af1e209af3c4030e7af90a20c722395c
 ```
 
 Then:
