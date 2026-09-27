@@ -6,6 +6,9 @@ New to Rust? Start with **[Local development setup](docs/LOCAL_SETUP.md)**.
 
 For the Kobo runtime/launch design, see **[Kobo launch architecture](docs/KOBO_ARCHITECTURE.md)**.
 
+For sleep findings, fixes, and the remaining early-touch issue, see
+**[Sleep troubleshooting](docs/SLEEP_TROUBLESHOOTING.md)**.
+
 To install on a connected Kobo, follow **[USB device installation](docs/DEVICE_INSTALL.md)**.
 If the reader already has the older `NickelMenu -> Cobalt -> Chess` build,
 follow **[Update to direct launch](docs/DEVICE_UPDATE_DIRECT_LAUNCH.md)**.
@@ -15,8 +18,9 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 ## MVP
 
 - 8×8 board
-- load positions from standard FEN notation
-- browse saved positions with the Kobo page-turn buttons
+- load puzzles with a FEN, optional description, and solution from JSON
+- browse saved puzzles with the Kobo page-turn buttons
+- face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
 - touch any square to move it
 - touch the selected piece again to deselect it
@@ -27,12 +31,17 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 That is intentional: version 0.1 behaves like a physical board and position
 viewer, not a chess game. It does not enforce legal moves or play turns.
 
-On first launch, the app creates `.adds/cobalt/state/eink-chess/positions.fen`
-from the ten positions in [examples/positions.fen](examples/positions.fen).
-Edit that file over USB while the app is closed. Put one six-field FEN position
-on each line; blank lines and lines starting with `#` are ignored. Forward and
-back page-turn buttons move through the list, and **Reset** restores the
-position for the current FEN line.
+Place a UTF-8 `puzzles.json` file at
+`.adds/cobalt/state/eink-chess/puzzles.json` on the mounted reader while the app
+is closed. The [puzzle file format](docs/PUZZLE_FORMAT.md) documents the fields.
+If the file is missing, the app creates the ten CC0 Lichess examples in
+[examples/puzzles.json](examples/puzzles.json). The deployment script also
+installs those examples when no puzzle file exists.
+
+Page-turn buttons browse the puzzles. **Reset** restores the current puzzle's
+FEN; **Flip** changes the viewing side. Each newly selected puzzle automatically
+faces the color whose turn is recorded in the FEN. Solutions are loaded but
+are not yet checked or revealed. The old `positions.fen` file is no longer read.
 
 ## Architecture
 
@@ -70,7 +79,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-6737d128b3110a79a8b25216c58995b5ddc4b37c
+1af8797ee06457d637b94bd42972bc907e5d82d1
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This

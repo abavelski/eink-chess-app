@@ -47,6 +47,8 @@ name = "eink-chess-app"
 version = "0.1.0"
 dependencies = [
  "kobo-sdk",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -151,7 +153,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "kobo-abi"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "libc",
 ]
@@ -159,7 +161,7 @@ dependencies = [
 [[package]]
 name = "kobo-dict"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "unicode-normalization",
 ]
@@ -167,12 +169,12 @@ dependencies = [
 [[package]]
 name = "kobo-json"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 
 [[package]]
 name = "kobo-net"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "http",
  "httparse",
@@ -186,7 +188,7 @@ dependencies = [
 [[package]]
 name = "kobo-policy"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "kobo-abi",
  "kobo-dict",
@@ -199,7 +201,7 @@ dependencies = [
 [[package]]
 name = "kobo-protocol"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "kobo-ui",
 ]
@@ -207,7 +209,7 @@ dependencies = [
 [[package]]
 name = "kobo-sdk"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "kobo-json",
  "kobo-net",
@@ -221,7 +223,7 @@ dependencies = [
 [[package]]
 name = "kobo-state"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "kobo-json",
 ]
@@ -229,7 +231,7 @@ dependencies = [
 [[package]]
 name = "kobo-text"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "fontdue",
  "kobo-ui",
@@ -240,7 +242,7 @@ dependencies = [
 [[package]]
 name = "kobo-ui"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=6737d128b3110a79a8b25216c58995b5ddc4b37c#6737d128b3110a79a8b25216c58995b5ddc4b37c"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
 dependencies = [
  "unicode-segmentation",
  "unicode-width",
@@ -264,6 +266,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,6 +291,24 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+
+[[package]]
+name = "proc-macro2"
+version = "1.0.107"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
+dependencies = [
+ "unicode-ident",
+]
+
+[[package]]
+name = "quote"
+version = "1.0.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
+dependencies = [
+ "proc-macro2",
+]
 
 [[package]]
 name = "ring"
@@ -347,6 +373,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_core"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.151"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+dependencies = [
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
+]
+
+[[package]]
 name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -365,6 +434,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "syn"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "tinyvec"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,6 +455,12 @@ name = "ttf-parser"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
+
+[[package]]
+name = "unicode-ident"
+version = "1.0.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
 
 [[package]]
 name = "unicode-linebreak"
@@ -508,3 +594,9 @@ name = "zeroize"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
+
+[[package]]
+name = "zmij"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"

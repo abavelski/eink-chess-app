@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-PINNED_COBALT = "6737d128b3110a79a8b25216c58995b5ddc4b37c"
+PINNED_COBALT = "1af8797ee06457d637b94bd42972bc907e5d82d1"
 APP = Path(__file__).resolve().parents[1]
 COBALT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else APP.parent / "Cobalt"
 
@@ -58,17 +58,19 @@ if revision != PINNED_COBALT:
 
 destination = COBALT / "examples" / "eink-chess"
 (destination / "src").mkdir(parents=True, exist_ok=True)
-for name in ("main.rs", "board.rs"):
+for name in ("main.rs", "board.rs", "puzzle.rs"):
     shutil.copy2(APP / "src" / name, destination / "src" / name)
 main = destination / "src" / "main.rs"
 main.write_text(
     main.read_text().replace(
-        'include_str!("../examples/positions.fen")',
-        'include_str!("positions.fen")',
+        'include_bytes!("../examples/puzzles.json")',
+        'include_bytes!("puzzles.json")',
     )
 )
-shutil.copy2(APP / "examples" / "positions.fen", destination / "src" / "positions.fen")
-(destination / "Cargo.toml").write_text(
+shutil.copy2(APP / "examples" / "puzzles.json", destination / "src" / "puzzles.json")
+manifest_path = destination / "Cargo.toml"
+previous_manifest = manifest_path.read_text() if manifest_path.exists() else ""
+manifest = (
     '[package]\n'
     'name = "kobo-eink-chess"\n'
     'version = "0.1.0"\n'
@@ -76,10 +78,13 @@ shutil.copy2(APP / "examples" / "positions.fen", destination / "src" / "position
     'rust-version.workspace = true\n'
     'publish = false\n\n'
     '[dependencies]\n'
-    'kobo-sdk = { path = "../../crates/kobo-sdk" }\n\n'
+    'kobo-sdk = { path = "../../crates/kobo-sdk" }\n'
+    'serde = { version = "1", features = ["derive"] }\n'
+    'serde_json = "1"\n\n'
     '[lints]\n'
     'workspace = true\n'
 )
+manifest_path.write_text(manifest)
 
 add_after(
     COBALT / "Cargo.toml",
@@ -122,5 +127,10 @@ replace_once(
     'menu_item :main :Cobalt :cmd_spawn :quiet:{}',
     'menu_item :main :E-Ink Chess :cmd_spawn :quiet:{}',
 )
+
+# Resolve this generated package's changed dependencies before the deployment
+# script runs its tests with --locked. Other workspace packages keep their pins.
+if manifest != previous_manifest:
+    subprocess.run(["cargo", "update", "-p", "kobo-eink-chess"], cwd=COBALT, check=True)
 
 print(f"Prepared {destination} for direct NickelMenu launch through Cobalt")

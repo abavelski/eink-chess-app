@@ -106,11 +106,14 @@ squares retain their touch actions. The source SVGs and their generated vector
 paths live in `assets/sashite-western`. `src/board.rs` remains pure board state
 and parses standard six-field FEN positions.
 
-The app's FEN list is kept in Cobalt's durable per-app store as
-`.adds/cobalt/state/eink-chess/positions.fen`. The first launch copies the ten
-bundled positions there. The file contains one FEN per line and can be edited
-over USB while the app is closed. The reader's physical page-turn buttons move
-through the saved positions; **Reset** restores the current line's FEN.
+The puzzle list is kept in Cobalt's durable per-app store as
+`.adds/cobalt/state/eink-chess/puzzles.json`. The first launch copies the ten
+bundled CC0 Lichess puzzles there if the file is absent. Each puzzle contains
+a FEN, an optional description, and a UCI solution line. The FEN active color
+selects the board orientation. The file can be edited over USB while the app
+is closed. Page-turn buttons browse the puzzles; **Reset** restores the current
+puzzle's FEN. Solutions are retained for future solving features. See
+[the puzzle format](PUZZLE_FORMAT.md).
 
 ## Architecture B — fully standalone Kobo application
 

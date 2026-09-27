@@ -24,8 +24,8 @@ command -v rustup >/dev/null || fail "rustup is required"
 
 [[ -f "${COBALT_DIR}/Cargo.toml" ]] || fail "Cobalt checkout not found at ${COBALT_DIR}"
 
-if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "6737d128b3110a79a8b25216c58995b5ddc4b37c" ]]; then
-    fail "Cobalt is not at the pinned revision 6737d128b3110a79a8b25216c58995b5ddc4b37c"
+if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "1af8797ee06457d637b94bd42972bc907e5d82d1" ]]; then
+    fail "Cobalt is not at the pinned revision 1af8797ee06457d637b94bd42972bc907e5d82d1"
 fi
 
 printf '%s\n' 'Preparing pinned Cobalt with the current E-Ink Chess sources…'
@@ -103,6 +103,18 @@ INSTALLED_HASH="$(shasum -a 256 "${INSTALLED_CHESS}" | awk '{print $1}')"
 [[ "${EXPECTED_HASH}" == "${INSTALLED_HASH}" ]] || fail "installed chess binary checksum does not match the build"
 grep -q 'E-Ink Chess' "${MENU_FILE}" || fail "NickelMenu entry is not E-Ink Chess"
 grep -q 'kobo-eink-chess' "${START_FILE}" || fail "Cobalt is not configured to launch E-Ink Chess"
+
+PUZZLE_DIR="${VOLUME}/.adds/cobalt/state/eink-chess"
+PUZZLE_FILE="${PUZZLE_DIR}/puzzles.json"
+EXAMPLE_FILE="${APP_DIR}/examples/puzzles.json"
+mkdir -p "${PUZZLE_DIR}"
+if [[ ! -e "${PUZZLE_FILE}" ]]; then
+    cp "${EXAMPLE_FILE}" "${PUZZLE_FILE}"
+    cmp -s "${EXAMPLE_FILE}" "${PUZZLE_FILE}" || fail "installed example puzzle file does not match"
+    printf '%s\n' 'Installed ten CC0 Lichess example puzzles in .adds/cobalt/state/eink-chess/puzzles.json.'
+else
+    printf '%s\n' 'Kept the existing puzzles.json file.'
+fi
 
 printf 'Installed ARM chess binary (%s)\n' "${EXPECTED_HASH}"
 printf '%s\n' 'E-Ink Chess menu and direct-launch checks passed.'
