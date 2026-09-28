@@ -74,3 +74,27 @@ Remember which puzzles have already been solved correctly and which puzzle the u
 - The exact representation can be decided during implementation; if progress is written directly into the puzzle JSON, the puzzle format/versioning and compatibility with externally supplied files will need to be updated deliberately.
 - Solved-state indicators should remain clear on a monochrome e-ink display and should not depend on color.
 
+## 4. Browse only unsolved puzzles
+
+Add an optional navigation filter so the existing puzzle browsing controls can skip puzzles that have already been solved.
+
+### Goal
+
+Make practice sessions more efficient by letting the user move through only the puzzles that still need work.
+
+### Expected behavior
+
+- Add a visible toggle button for switching between **All puzzles** and **Unsolved only** browsing.
+- When the filter is off, navigation behaves as it does today and moves through every puzzle in the active file.
+- When the filter is on, previous/next navigation skips puzzles already marked solved and lands only on unsolved puzzles.
+- The toggle state should be visually obvious on the monochrome e-ink display.
+- If the current puzzle is solved when the filter is enabled, move to an appropriate unsolved puzzle if one is available.
+- If no unsolved puzzles remain in the active file, show a clear message rather than making navigation appear broken.
+- Switching the filter off should immediately restore normal browsing across the full collection.
+
+### Notes
+
+- This feature depends on the persisted solved-state tracking described above.
+- The exact wording and placement of the toggle can be refined with the rest of the toolbar/navigation UI.
+- Whether the filter state itself should persist across app restarts can be decided during implementation.
+
