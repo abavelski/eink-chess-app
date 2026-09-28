@@ -153,7 +153,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "kobo-abi"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "libc",
 ]
@@ -161,7 +161,7 @@ dependencies = [
 [[package]]
 name = "kobo-dict"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "unicode-normalization",
 ]
@@ -169,12 +169,12 @@ dependencies = [
 [[package]]
 name = "kobo-json"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 
 [[package]]
 name = "kobo-net"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "http",
  "httparse",
@@ -188,7 +188,7 @@ dependencies = [
 [[package]]
 name = "kobo-policy"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "kobo-abi",
  "kobo-dict",
@@ -201,7 +201,7 @@ dependencies = [
 [[package]]
 name = "kobo-protocol"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "kobo-ui",
 ]
@@ -209,7 +209,7 @@ dependencies = [
 [[package]]
 name = "kobo-sdk"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "kobo-json",
  "kobo-net",
@@ -223,7 +223,7 @@ dependencies = [
 [[package]]
 name = "kobo-state"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "kobo-json",
 ]
@@ -231,7 +231,7 @@ dependencies = [
 [[package]]
 name = "kobo-text"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "fontdue",
  "kobo-ui",
@@ -242,7 +242,7 @@ dependencies = [
 [[package]]
 name = "kobo-ui"
 version = "0.3.22"
-source = "git+https://github.com/abavelski/Cobalt.git?rev=1af8797ee06457d637b94bd42972bc907e5d82d1#1af8797ee06457d637b94bd42972bc907e5d82d1"
+source = "git+https://github.com/abavelski/Cobalt.git?rev=e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55#e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 dependencies = [
  "unicode-segmentation",
  "unicode-width",

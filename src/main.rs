@@ -16,8 +16,7 @@ const CELLS: usize = SIDE * SIDE;
 const RESET: &str = "reset";
 const FLIP: &str = "flip";
 const EXIT: &str = "exit";
-const MODE_SOLUTION: &str = "mode-solution";
-const MODE_FREE_BOARD: &str = "mode-free-board";
+const MODE_TOGGLE: &str = "mode-toggle";
 const PUZZLE_PICKER: &str = "puzzle-picker";
 const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
 const COLLECTION_ACTION_PREFIX: &str = "collection-";
@@ -426,38 +425,33 @@ impl ChessBoardApp {
                 self.puzzles.len()
             )
         };
+        let free_board = self.mode == BoardMode::FreeBoard;
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
             .top_bar_action(PUZZLE_PICKER, "Puzzles")
             .board_with_selection(SIDE as u8, cells)
-            .chips([
-                (MODE_SOLUTION, "Solution", self.mode == BoardMode::Solution),
-                (
-                    MODE_FREE_BOARD,
-                    "Free board",
-                    self.mode == BoardMode::FreeBoard,
-                ),
-            ])
             .band(
                 BandAlign::Middle,
                 [
                     (
                         SlotWidth::Fill,
-                        (|slot: ScreenBuilder| slot) as fn(ScreenBuilder) -> ScreenBuilder,
+                        Box::new(|slot: ScreenBuilder| slot)
+                            as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
-                        // Two 10 mm targets with the grid's 1 mm gap.
-                        SlotWidth::Fixed(210),
-                        |slot| {
-                            slot.controls(
-                                2,
+                        // Three 10 mm targets with two 1 mm gaps.
+                        SlotWidth::Fixed(320),
+                        Box::new(move |slot| {
+                            slot.controls_with_selection(
+                                3,
                                 [
-                                    (RESET, "Reset position", Glyph::Refresh),
-                                    (FLIP, "Flip board", Glyph::SwapVertical),
+                                    (MODE_TOGGLE, "Toggle free board", Glyph::Grid, free_board),
+                                    (RESET, "Reset position", Glyph::Refresh, false),
+                                    (FLIP, "Flip board", Glyph::SwapVertical, false),
                                 ],
                             )
-                        },
+                        }),
                     ),
                 ],
             );
@@ -882,14 +876,11 @@ impl KoboApp for ChessBoardApp {
             return;
         }
 
-        if action == action_id(MODE_SOLUTION) {
-            self.set_mode(BoardMode::Solution);
-            self.show(context);
-            return;
-        }
-
-        if action == action_id(MODE_FREE_BOARD) {
-            self.set_mode(BoardMode::FreeBoard);
+        if action == action_id(MODE_TOGGLE) {
+            self.set_mode(match self.mode {
+                BoardMode::Solution => BoardMode::FreeBoard,
+                BoardMode::FreeBoard => BoardMode::Solution,
+            });
             self.show(context);
             return;
         }
@@ -1606,7 +1597,7 @@ mod tests {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let initial = runner.app().board.clone();
 
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
         assert_eq!(runner.app().mode, BoardMode::FreeBoard);
         play(&mut runner, "d7d8");
 
@@ -1624,7 +1615,7 @@ mod tests {
         assert_eq!(runner.app().solution_ply, 2);
         let current = runner.app().board.clone();
 
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
 
         assert_eq!(runner.app().mode, BoardMode::FreeBoard);
         assert_eq!(runner.app().board, current);
@@ -1640,12 +1631,12 @@ mod tests {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let initial = runner.app().board.clone();
 
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
         play(&mut runner, "d7d8");
         runner.action(action_id(FLIP));
         assert!(runner.app().flipped);
 
-        runner.action(action_id(MODE_SOLUTION));
+        runner.action(action_id(MODE_TOGGLE));
 
         assert_eq!(runner.app().mode, BoardMode::Solution);
         assert_eq!(runner.app().board, initial);
@@ -1657,7 +1648,7 @@ mod tests {
     #[test]
     fn reset_and_navigation_preserve_free_board_mode() {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
         let initial = runner.app().board.clone();
 
         play(&mut runner, "d7d8");
@@ -1678,7 +1669,7 @@ mod tests {
     #[test]
     fn promotion_works_without_grading_in_free_board() {
         let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
 
         play(&mut runner, "a7a8r");
 
@@ -1911,7 +1902,7 @@ mod tests {
 
         ack_progress_save(&mut runner);
         runner.action(action_id(RESET));
-        runner.action(action_id(MODE_FREE_BOARD));
+        runner.action(action_id(MODE_TOGGLE));
         play(&mut runner, "d7d8");
 
         assert_eq!(
@@ -2118,14 +2109,28 @@ mod tests {
                         (flip.x + flip.width - board_frame.x - board_frame.width).abs() <= 1,
                         "toolbar should align with the outer board border"
                     );
-                    for action in [RESET, FLIP] {
+                    let mode_cell = diagnostics
+                        .layout
+                        .nodes
+                        .iter()
+                        .find(|node| {
+                            matches!(node.kind, kobo_sdk::LayoutKind::Cell(action, _, _)
+                                if action == action_id(MODE_TOGGLE))
+                        })
+                        .expect("mode toggle should have a cell");
+                    assert!(matches!(
+                        mode_cell.kind,
+                        kobo_sdk::LayoutKind::Cell(_, _, selected)
+                            if selected == (mode == BoardMode::FreeBoard)
+                    ));
+                    for action in [MODE_TOGGLE, RESET, FLIP] {
                         let button = rect_for(action_id(action));
                         assert!(
                             (button.width - button.height).abs() <= 1,
                             "button should be square"
                         );
                     }
-                    for action in [MODE_SOLUTION, MODE_FREE_BOARD, PUZZLE_PICKER] {
+                    for action in [MODE_TOGGLE, PUZZLE_PICKER] {
                         rect_for(action_id(action));
                     }
                 }

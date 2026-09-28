@@ -93,6 +93,8 @@ moves without grading or advancing the solution. Reset still restores the
 current FEN, Flip still changes orientation, and page buttons still browse
 puzzles. Returning from Free board to Solution restores the puzzle FEN and
 restarts its solution while preserving the current orientation.
+The leftmost grid icon below the board toggles the modes. It has a gray fill
+while Free board is active.
 
 ## Multiple collections, missing files, and invalid files
 

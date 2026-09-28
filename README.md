@@ -39,9 +39,10 @@ The app is still intentionally not a chess game or engine. In **Solution**
 mode it does not enforce legal chess moves; it only checks whether the attempted
 move matches the next stored UCI move and applies the stored opponent reply.
 **Free board** mode turns the current position into a physical scratch board:
-moves are not graded and do not advance the solution. Returning to Solution
-mode restores the puzzle FEN and restarts the attempt while preserving the
-current board orientation.
+moves are not graded and do not advance the solution. The leftmost grid icon in
+the three-button toolbar toggles this mode; its gray fill shows when Free board
+is active. Tapping it again returns to Solution, restores the puzzle FEN, and
+restarts the attempt while preserving the current board orientation.
 
 Place UTF-8 puzzle collections in `.adds/cobalt/state/eink-chess/` on the
 mounted reader while the app is closed. The default collection is
@@ -100,7 +101,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-1af8797ee06457d637b94bd42972bc907e5d82d1
+e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This

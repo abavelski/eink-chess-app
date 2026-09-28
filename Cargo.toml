@@ -6,6 +6,6 @@ rust-version = "1.85.1"
 publish = false
 
 [dependencies]
-kobo-sdk = { git = "https://github.com/abavelski/Cobalt.git", rev = "1af8797ee06457d637b94bd42972bc907e5d82d1" }
+kobo-sdk = { git = "https://github.com/abavelski/Cobalt.git", rev = "e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 
-PINNED_COBALT = "1af8797ee06457d637b94bd42972bc907e5d82d1"
+PINNED_COBALT = "e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55"
 APP = Path(__file__).resolve().parents[1]
 COBALT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else APP.parent / "Cobalt"
 
@@ -58,16 +58,23 @@ if revision != PINNED_COBALT:
 
 destination = COBALT / "examples" / "eink-chess"
 (destination / "src").mkdir(parents=True, exist_ok=True)
-for name in ("main.rs", "board.rs", "puzzle.rs"):
+for name in ("main.rs", "board.rs", "progress.rs", "puzzle.rs"):
     shutil.copy2(APP / "src" / name, destination / "src" / name)
 main = destination / "src" / "main.rs"
 main.write_text(
     main.read_text().replace(
         'include_bytes!("../examples/puzzles.json")',
         'include_bytes!("puzzles.json")',
+    ).replace(
+        'include_bytes!("../examples/promotion-puzzles.json")',
+        'include_bytes!("promotion-puzzles.json")',
     )
 )
 shutil.copy2(APP / "examples" / "puzzles.json", destination / "src" / "puzzles.json")
+shutil.copy2(
+    APP / "examples" / "promotion-puzzles.json",
+    destination / "src" / "promotion-puzzles.json",
+)
 manifest_path = destination / "Cargo.toml"
 previous_manifest = manifest_path.read_text() if manifest_path.exists() else ""
 manifest = (
