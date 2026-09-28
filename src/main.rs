@@ -957,12 +957,15 @@ mod tests {
             }
         }
 
-        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        let (mut promotion_runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
         let movement = parse_uci_move("a7a8q").unwrap();
-        runner.action(action_id(&square_action(movement.from)));
-        runner.action(action_id(&square_action(movement.to)));
-        let screen = runner.app().screen();
-        let diagnostics = screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        promotion_runner.action(action_id(&square_action(movement.from)));
+        promotion_runner.action(action_id(&square_action(movement.to)));
+        let screen = promotion_runner.app().screen();
+        let diagnostics = screen.diagnostics(
+            &promotion_runner.context().metrics(),
+            &Chrome::measuring(false),
+        );
         assert!(
             !diagnostics.has_errors(),
             "promotion modal: {:?}",
