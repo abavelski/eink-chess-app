@@ -74,7 +74,9 @@ and uses the solution as an exact move sequence. The user enters only the solver
 plies (indexes 0, 2, 4, ...). A correct solver move is kept, the following stored
 opponent ply is applied automatically, and the app then waits for the next
 solver move. A wrong move is restored immediately and does not advance the
-solution. Finishing the sequence shows **Solution complete**.
+solution. A correct intermediate move adds **Correct** to the turn line.
+Finishing the sequence shows a centered thumbs up over the board; an incorrect
+move shows a thumbs down. Reset removes the result icon.
 
 This is solution matching, not general chess-rule enforcement: the app still
 does not decide whether an ordinary move is legal, whether a king is in check,

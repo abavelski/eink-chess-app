@@ -26,7 +26,7 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
 - touch a square to attempt the next solution move
-- show explicit Correct / Wrong / Solution complete feedback
+- show a small Correct hint or a centered thumbs result over the board
 - automatically apply stored opponent replies between solver moves
 - reject a wrong move and restore the previous position
 - choose Queen, Rook, Bishop, or Knight when a pawn reaches the last rank
@@ -60,8 +60,10 @@ app. **Reset** restores the current puzzle's FEN and restarts its solution;
 **Flip** changes only the viewing side. Each newly selected puzzle automatically faces
 the color whose turn is recorded in the FEN.
 Solver moves are checked against the stored UCI line. Correct moves are accepted,
-wrong moves are restored, stored opponent replies are applied automatically, and
-the final move shows **Solution complete**. Completed puzzle IDs are stored
+stored opponent replies are applied automatically, and the turn line adds
+**Correct** until the next move. A wrong move is restored with a centered thumbs
+down; completing the solution shows a centered thumbs up. **Reset** removes
+either icon. Completed puzzle IDs are stored
 separately in `progress.v1`; uploaded puzzle JSON files are never modified.
 The old `positions.fen` file is no longer read.
 
@@ -101,7 +103,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-e1c9c311cbb77acd1d9c3fe1efad69d9eca7ae55
+ff4ec9950e178243807082bf818e42c8538d080e
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This
