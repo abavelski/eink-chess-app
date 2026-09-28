@@ -262,6 +262,7 @@ impl ChessBoardApp {
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
+            .top_bar_action(PUZZLE_PICKER, "Puzzles")
             .board_with_selection(SIDE as u8, cells)
             .chips([
                 (MODE_SOLUTION, "Solution", self.mode == BoardMode::Solution),
@@ -276,8 +277,7 @@ impl ChessBoardApp {
                 [
                     (
                         SlotWidth::Fill,
-                        (|slot: ScreenBuilder| slot.button(PUZZLE_PICKER, "Puzzles"))
-                            as fn(ScreenBuilder) -> ScreenBuilder,
+                        (|slot: ScreenBuilder| slot) as fn(ScreenBuilder) -> ScreenBuilder,
                     ),
                     (
                         // Two 10 mm targets with the grid's 1 mm gap.
