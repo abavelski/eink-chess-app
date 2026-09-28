@@ -14,6 +14,8 @@ const CELLS: usize = SIDE * SIDE;
 const RESET: &str = "reset";
 const FLIP: &str = "flip";
 const EXIT: &str = "exit";
+const MODE_SOLUTION: &str = "mode-solution";
+const MODE_FREE_BOARD: &str = "mode-free-board";
 const PROMOTE_QUEEN: &str = "promote-queen";
 const PROMOTE_ROOK: &str = "promote-rook";
 const PROMOTE_BISHOP: &str = "promote-bishop";
@@ -21,6 +23,13 @@ const PROMOTE_KNIGHT: &str = "promote-knight";
 const PROMOTION_CANCEL: &str = "promotion-cancel";
 const PUZZLES_FILE: &str = "puzzles.json";
 const EXAMPLE_PUZZLES: &[u8] = include_bytes!("../examples/puzzles.json");
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum BoardMode {
+    #[default]
+    Solution,
+    FreeBoard,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SolutionFeedback {
@@ -50,6 +59,7 @@ struct ChessBoardApp {
     puzzle_index: usize,
     solution_ply: usize,
     solution_feedback: Option<SolutionFeedback>,
+    mode: BoardMode,
     pending_promotion: Option<PendingPromotion>,
     file_error: Option<String>,
     sleeping: bool,
@@ -119,6 +129,18 @@ impl ChessBoardApp {
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
             .board_with_selection(SIDE as u8, cells)
+            .chips([
+                (
+                    MODE_SOLUTION,
+                    "Solution",
+                    self.mode == BoardMode::Solution,
+                ),
+                (
+                    MODE_FREE_BOARD,
+                    "Free board",
+                    self.mode == BoardMode::FreeBoard,
+                ),
+            ])
             .band(
                 BandAlign::Middle,
                 [
@@ -142,8 +164,9 @@ impl ChessBoardApp {
                 ],
             );
 
-        if let Some(feedback) = self.solution_feedback {
-            screen = match feedback {
+        if self.mode == BoardMode::Solution {
+            if let Some(feedback) = self.solution_feedback {
+                screen = match feedback {
                 SolutionFeedback::Correct => screen.banner(BannerLevel::Info, "Correct"),
                 SolutionFeedback::Wrong => {
                     screen.banner(BannerLevel::Attention, "Wrong move — try again")
@@ -151,13 +174,17 @@ impl ChessBoardApp {
                 SolutionFeedback::Complete => {
                     screen.banner(BannerLevel::Attention, "Solution complete")
                 }
-            };
+                };
+            }
         }
 
         if let Some(puzzle) = self.puzzles.get(self.puzzle_index) {
-            screen = screen.secondary(match puzzle.side_to_move() {
-                Color::White => "White to move",
-                Color::Black => "Black to move",
+            screen = screen.secondary(match self.mode {
+                BoardMode::Solution => match puzzle.side_to_move() {
+                    Color::White => "White to move",
+                    Color::Black => "Black to move",
+                },
+                BoardMode::FreeBoard => "Free board — moves are not graded",
             });
             if let Some(description) = puzzle
                 .description
@@ -206,7 +233,8 @@ impl ChessBoardApp {
     }
 
     fn handle_square_tap(&mut self, square: usize) -> bool {
-        if self.solution_feedback == Some(SolutionFeedback::Complete)
+        if (self.mode == BoardMode::Solution
+            && self.solution_feedback == Some(SolutionFeedback::Complete))
             || self.pending_promotion.is_some()
         {
             return false;
@@ -217,8 +245,10 @@ impl ChessBoardApp {
             TapResult::NoChange => false,
             TapResult::SelectionChanged => true,
             TapResult::Moved { from, to } => {
-                let attempted = uci_move(from, to, None);
-                self.check_solver_move(before, &attempted);
+                if self.mode == BoardMode::Solution {
+                    let attempted = uci_move(from, to, None);
+                    self.check_solver_move(before, &attempted);
+                }
                 true
             }
             TapResult::Promotion { from, to, .. } => {
@@ -242,8 +272,30 @@ impl ChessBoardApp {
             return;
         }
 
-        let attempted = uci_move(pending.from, pending.to, Some(kind));
-        self.check_solver_move(before, &attempted);
+        if self.mode == BoardMode::Solution {
+            let attempted = uci_move(pending.from, pending.to, Some(kind));
+            self.check_solver_move(before, &attempted);
+        }
+    }
+
+    fn set_mode(&mut self, mode: BoardMode) {
+        if self.mode == mode {
+            return;
+        }
+
+        self.pending_promotion = None;
+        self.board.clear_selection();
+        match mode {
+            BoardMode::FreeBoard => {
+                self.mode = BoardMode::FreeBoard;
+                self.solution_feedback = None;
+            }
+            BoardMode::Solution => {
+                self.board.reset();
+                self.reset_attempt();
+                self.mode = BoardMode::Solution;
+            }
+        }
     }
 
     fn cancel_promotion(&mut self) {
@@ -378,6 +430,18 @@ impl KoboApp for ChessBoardApp {
 
         if action == action_id(EXIT) {
             context.exit();
+            return;
+        }
+
+        if action == action_id(MODE_SOLUTION) {
+            self.set_mode(BoardMode::Solution);
+            self.show(context);
+            return;
+        }
+
+        if action == action_id(MODE_FREE_BOARD) {
+            self.set_mode(BoardMode::FreeBoard);
+            self.show(context);
             return;
         }
 
@@ -859,6 +923,99 @@ mod tests {
     }
 
     #[test]
+    fn free_board_accepts_wrong_moves_without_advancing_solution() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        let initial = runner.app().board.clone();
+
+        runner.action(action_id(MODE_FREE_BOARD));
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        play(&mut runner, "d7d8");
+
+        assert_ne!(runner.app().board, initial);
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(runner.app().solution_feedback, None);
+    }
+
+    #[test]
+    fn entering_free_board_keeps_the_current_solved_line_position() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        runner.page_turn(true);
+        runner.page_turn(true);
+        play(&mut runner, "e2e6");
+        assert_eq!(runner.app().solution_ply, 2);
+        let current = runner.app().board.clone();
+
+        runner.action(action_id(MODE_FREE_BOARD));
+
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        assert_eq!(runner.app().board, current);
+        assert_eq!(runner.app().solution_ply, 2);
+        assert_eq!(runner.app().solution_feedback, None);
+
+        play(&mut runner, "e6e5");
+        assert_eq!(runner.app().solution_ply, 2);
+    }
+
+    #[test]
+    fn returning_to_solution_resets_position_attempt_and_keeps_flip() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        let initial = runner.app().board.clone();
+
+        runner.action(action_id(MODE_FREE_BOARD));
+        play(&mut runner, "d7d8");
+        runner.action(action_id(FLIP));
+        assert!(runner.app().flipped);
+
+        runner.action(action_id(MODE_SOLUTION));
+
+        assert_eq!(runner.app().mode, BoardMode::Solution);
+        assert_eq!(runner.app().board, initial);
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(runner.app().solution_feedback, None);
+        assert!(runner.app().flipped);
+    }
+
+    #[test]
+    fn reset_and_navigation_preserve_free_board_mode() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        runner.action(action_id(MODE_FREE_BOARD));
+        let initial = runner.app().board.clone();
+
+        play(&mut runner, "d7d8");
+        assert_ne!(runner.app().board, initial);
+
+        runner.action(action_id(RESET));
+        assert_eq!(runner.app().board, initial);
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzle_index, 1);
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        runner.page_turn(false);
+        assert_eq!(runner.app().puzzle_index, 0);
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+    }
+
+    #[test]
+    fn promotion_works_without_grading_in_free_board() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        runner.action(action_id(MODE_FREE_BOARD));
+
+        play(&mut runner, "a7a8r");
+
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(runner.app().solution_feedback, None);
+        assert_eq!(
+            runner.app().board.piece_at(square_from_name("a8").unwrap()),
+            Some(Piece {
+                color: Color::White,
+                kind: PieceKind::Rook,
+            })
+        );
+    }
+
+    #[test]
     fn puzzle_navigation_sets_orientation_and_keeps_board_controls() {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         assert_eq!(runner.app().puzzles.len(), 10);
@@ -922,18 +1079,20 @@ mod tests {
         ];
         for index in 0..layout_runner.app().puzzles.len() {
             layout_runner.app_mut().select_puzzle(index);
-            for feedback in feedback_states {
-                layout_runner.app_mut().solution_feedback = feedback;
-                let screen = layout_runner.app().screen();
+            for mode in [BoardMode::Solution, BoardMode::FreeBoard] {
+                layout_runner.app_mut().mode = mode;
+                for feedback in feedback_states {
+                    layout_runner.app_mut().solution_feedback = feedback;
+                    let screen = layout_runner.app().screen();
                 let diagnostics = screen.diagnostics(
                     &layout_runner.context().metrics(),
                     &Chrome::measuring(false),
                 );
-                assert!(
-                    !diagnostics.has_errors(),
-                    "puzzle {index}, feedback {feedback:?}: {:?}",
-                    diagnostics.issues
-                );
+                    assert!(
+                        !diagnostics.has_errors(),
+                        "puzzle {index}, mode {mode:?}, feedback {feedback:?}: {:?}",
+                        diagnostics.issues
+                    );
                 let rect_for = |action| {
                     diagnostics
                         .layout
@@ -955,12 +1114,16 @@ mod tests {
                     (flip.x + flip.width - board_frame.x - board_frame.width).abs() <= 1,
                     "toolbar should align with the outer board border"
                 );
-                for action in [RESET, FLIP] {
-                    let button = rect_for(action_id(action));
-                    assert!(
-                        (button.width - button.height).abs() <= 1,
-                        "button should be square"
-                    );
+                    for action in [RESET, FLIP] {
+                        let button = rect_for(action_id(action));
+                        assert!(
+                            (button.width - button.height).abs() <= 1,
+                            "button should be square"
+                        );
+                    }
+                    for action in [MODE_SOLUTION, MODE_FREE_BOARD] {
+                        rect_for(action_id(action));
+                    }
                 }
             }
         }

@@ -80,6 +80,13 @@ does not change until the user chooses **Queen**, **Rook**, **Bishop**, or
 its original square. Stored opponent promotion replies are applied
 automatically without opening the dialog.
 
+The board has two modes. **Solution** checks moves as described above. **Free
+board** keeps the currently visible position but accepts arbitrary physical-board
+moves without grading or advancing the solution. Reset still restores the
+current FEN, Flip still changes orientation, and page buttons still browse
+puzzles. Returning from Free board to Solution restores the puzzle FEN and
+restarts its solution while preserving the current orientation.
+
 ## Missing or invalid files
 
 If `puzzles.json` is missing, the app saves and loads the bundled examples.

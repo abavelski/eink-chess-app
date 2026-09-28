@@ -27,13 +27,18 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - automatically apply stored opponent replies between solver moves
 - reject a wrong move and restore the previous position
 - choose Queen, Rook, Bishop, or Knight when a pawn reaches the last rank
+- switch between graded **Solution** mode and an ungraded **Free board**
 - touch the selected piece again to deselect it
 - reset the board and solution attempt to the current FEN position
 - return cleanly to the Kobo reader
 
-The app is still intentionally not a chess game or engine. It does not enforce
-legal chess moves; during a puzzle it only checks whether the attempted move
-matches the next stored UCI move and applies the stored opponent reply.
+The app is still intentionally not a chess game or engine. In **Solution**
+mode it does not enforce legal chess moves; it only checks whether the attempted
+move matches the next stored UCI move and applies the stored opponent reply.
+**Free board** mode turns the current position into a physical scratch board:
+moves are not graded and do not advance the solution. Returning to Solution
+mode restores the puzzle FEN and restarts the attempt while preserving the
+current board orientation.
 
 Place a UTF-8 `puzzles.json` file at
 `.adds/cobalt/state/eink-chess/puzzles.json` on the mounted reader while the app

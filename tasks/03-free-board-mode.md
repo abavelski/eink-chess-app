@@ -1,6 +1,6 @@
 # Task 03 — Solution mode / Free board mode
 
-**Status:** Ready  
+**Status:** Implemented  
 **Depends on:** Tasks 01 and 02  
 **Primary files:** `src/main.rs`, screen diagnostics/tests
 
