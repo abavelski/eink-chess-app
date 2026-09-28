@@ -741,8 +741,14 @@ mod tests {
         runner.action(action_id(&square_action(movement.from)));
         runner.action(action_id(&square_action(movement.to)));
         assert!(runner.app().pending_promotion.is_some());
-        assert_eq!(runner.app().board.piece_at(movement.from), initial.piece_at(movement.from));
-        assert_eq!(runner.app().board.piece_at(movement.to), initial.piece_at(movement.to));
+        assert_eq!(
+            runner.app().board.piece_at(movement.from),
+            initial.piece_at(movement.from)
+        );
+        assert_eq!(
+            runner.app().board.piece_at(movement.to),
+            initial.piece_at(movement.to)
+        );
 
         runner.action(action_id(PROMOTION_CANCEL));
 
@@ -919,8 +925,10 @@ mod tests {
             for feedback in feedback_states {
                 layout_runner.app_mut().solution_feedback = feedback;
                 let screen = layout_runner.app().screen();
-                let diagnostics =
-                    screen.diagnostics(&layout_runner.context().metrics(), &Chrome::measuring(false));
+                let diagnostics = screen.diagnostics(
+                    &layout_runner.context().metrics(),
+                    &Chrome::measuring(false),
+                );
                 assert!(
                     !diagnostics.has_errors(),
                     "puzzle {index}, feedback {feedback:?}: {:?}",
