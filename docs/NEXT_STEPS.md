@@ -146,3 +146,28 @@ Let the user explore a position freely, like using a physical chessboard, withou
 - The active mode should be very obvious on the e-ink display so the user knows whether moves are currently being graded.
 - Whether board orientation should reset when returning to Solution mode can be decided during implementation; the puzzle position itself should definitely reset.
 
+## 7. Pawn promotion
+
+Implement pawn promotion when a pawn is moved onto the last rank.
+
+### Goal
+
+Handle one essential chess rule that cannot be represented correctly by simply moving the pawn piece to its destination square.
+
+### Expected behavior
+
+- Detect when a pawn move ends on the last rank for that pawn.
+- Before finalizing the move, open a simple promotion dialog.
+- Let the user choose one of the standard promotion pieces: **Queen**, **Rook**, **Bishop**, or **Knight**.
+- Replace the pawn with the selected piece on the destination square.
+- In Solution mode, include the selected promotion piece when converting the move to UCI, for example `a7a8q`.
+- Only compare the move with the expected solution after the promotion choice has been made.
+- In Free board mode, promotion should still work, but without grading the move.
+- The promotion dialog should use large, clear touch targets suitable for the e-ink display.
+
+### Notes
+
+- Promotion applies to both White reaching rank 8 and Black reaching rank 1.
+- The current puzzle format already supports promoted UCI moves such as `a7a8q`, so solution files do not need a schema change for this feature.
+- Underpromotion to rook, bishop, or knight should be supported from the start rather than assuming promotion always means queen.
+
