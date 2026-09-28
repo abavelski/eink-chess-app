@@ -797,8 +797,6 @@ impl KoboApp for ChessBoardApp {
                         entry.error = None;
                     }
                     self.activate_collection(Some(key.to_owned()), collection);
-                    self.remember_active_collection();
-                    self.save_progress(context);
                     self.show(context);
                 }
                 Err(error) => {
@@ -823,6 +821,8 @@ impl KoboApp for ChessBoardApp {
                         entry.error = None;
                     }
                     self.activate_collection(Some(key.to_owned()), collection);
+                    self.remember_active_collection();
+                    self.save_progress(context);
                     self.show(context);
                 }
                 Err(error) => {
