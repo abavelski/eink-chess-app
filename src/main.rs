@@ -1,6 +1,6 @@
 mod board;
-mod puzzle;
 mod progress;
+mod puzzle;
 
 use board::{Board, Color, Piece, PieceKind, TapResult};
 use kobo_sdk::{
@@ -169,15 +169,11 @@ impl ChessBoardApp {
     }
 
     fn load_initial_collection(&mut self, context: &mut Context) {
-        let remembered = self
-            .progress
-            .active_file
-            .as_deref()
-            .and_then(|key| {
-                self.collections
-                    .iter()
-                    .find(|entry| entry.key == key && entry.valid)
-            });
+        let remembered = self.progress.active_file.as_deref().and_then(|key| {
+            self.collections
+                .iter()
+                .find(|entry| entry.key == key && entry.valid)
+        });
         let preferred = remembered
             .or_else(|| {
                 self.collections
@@ -280,7 +276,10 @@ impl ChessBoardApp {
             return;
         };
         let changed_active = self.progress.set_active_file(&key);
-        let puzzle_id = self.puzzles.get(self.puzzle_index).map(|puzzle| puzzle.id.clone());
+        let puzzle_id = self
+            .puzzles
+            .get(self.puzzle_index)
+            .map(|puzzle| puzzle.id.clone());
         let changed_puzzle = puzzle_id
             .as_deref()
             .is_some_and(|id| self.progress.remember_puzzle(&key, id));
@@ -346,8 +345,7 @@ impl ChessBoardApp {
                 Err(error) => {
                     self.progress = Progress::new();
                     self.progress_durable = false;
-                    self.progress_warning =
-                        Some(format!("Progress file needs fixing: {error}"));
+                    self.progress_warning = Some(format!("Progress file needs fixing: {error}"));
                 }
             },
             StoreResult::Loaded { value: None, .. } => {
@@ -385,9 +383,13 @@ impl ChessBoardApp {
                     self.save_progress(context);
                 }
             }
-            StoreResult::Denied(_) | StoreResult::Loaded { .. } | StoreResult::Forgotten { .. }
-            | StoreResult::Keys(_) | StoreResult::ShelfWritten { .. }
-            | StoreResult::ShelfRead { .. } | StoreResult::ShelfRemoved { .. }
+            StoreResult::Denied(_)
+            | StoreResult::Loaded { .. }
+            | StoreResult::Forgotten { .. }
+            | StoreResult::Keys(_)
+            | StoreResult::ShelfWritten { .. }
+            | StoreResult::ShelfRead { .. }
+            | StoreResult::ShelfRemoved { .. }
             | StoreResult::Shelf(_) => {
                 self.progress_dirty = true;
                 self.progress_warning = Some("Progress not saved".into());
@@ -1992,7 +1994,10 @@ mod tests {
             ],
             Some(progress.to_bytes().unwrap()),
         );
-        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some(PUZZLES_FILE)
+        );
         assert_eq!(runner.app().puzzle_index, 0);
 
         let mut progress = Progress::new();
@@ -2018,10 +2023,8 @@ mod tests {
             b"not json".to_vec(),
             br#"{"version":2,"active_file":"puzzles.json","files":{}}"#.to_vec(),
         ] {
-            let (mut runner, _) = runner_with_state(
-                vec![(PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec())],
-                Some(bytes),
-            );
+            let (mut runner, _) =
+                runner_with_state(vec![(PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec())], Some(bytes));
             assert!(!runner.app().progress_durable);
             assert!(runner.app().progress_warning.is_some());
 
