@@ -62,9 +62,17 @@ the opponent's reply, and the solver's second move. The file represents one
 main solution line; branching alternatives can be introduced in a later
 format version.
 
-For now the app validates FENs and move notation, displays the description and
-turn, and retains the solution. It continues to allow free piece movement.
-It does not check legal moves, grade attempts, play replies, or show solutions.
+The app validates FENs and move notation, displays the description and turn,
+and uses the solution as an exact move sequence. The user enters only the solver
+plies (indexes 0, 2, 4, ...). A correct solver move is kept, the following stored
+opponent ply is applied automatically, and the app then waits for the next
+solver move. A wrong move is restored immediately and does not advance the
+solution. Finishing the sequence shows **Solution complete**.
+
+This is solution matching, not chess-rule enforcement: the app still does not
+decide whether a move is legal, whether a king is in check, or whether a
+position is checkmate. Promotion UCI such as `a7a8q` is already accepted by the
+file parser, but choosing a promotion piece on the board is a later task.
 
 ## Missing or invalid files
 

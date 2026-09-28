@@ -13,7 +13,7 @@ To install on a connected Kobo, follow **[USB device installation](docs/DEVICE_I
 If the reader already has the older `NickelMenu -> Cobalt -> Chess` build,
 follow **[Update to direct launch](docs/DEVICE_UPDATE_DIRECT_LAUNCH.md)**.
 
-The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine and no chess rules yet.
+The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine or legal-move enforcement; puzzle correctness is checked against the stored UCI solution line.
 
 ## MVP
 
@@ -22,14 +22,17 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - browse saved puzzles with the Kobo page-turn buttons
 - face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
-- touch any square to move it
+- touch a square to attempt the next solution move
+- show explicit Correct / Wrong / Solution complete feedback
+- automatically apply stored opponent replies between solver moves
+- reject a wrong move and restore the previous position
 - touch the selected piece again to deselect it
-- moving onto another piece simply replaces it
-- reset the board to the current FEN position
+- reset the board and solution attempt to the current FEN position
 - return cleanly to the Kobo reader
 
-That is intentional: version 0.1 behaves like a physical board and position
-viewer, not a chess game. It does not enforce legal moves or play turns.
+The app is still intentionally not a chess game or engine. It does not enforce
+legal chess moves; during a puzzle it only checks whether the attempted move
+matches the next stored UCI move and applies the stored opponent reply.
 
 Place a UTF-8 `puzzles.json` file at
 `.adds/cobalt/state/eink-chess/puzzles.json` on the mounted reader while the app
@@ -39,9 +42,12 @@ If the file is missing, the app creates the ten CC0 Lichess examples in
 installs those examples when no puzzle file exists.
 
 Page-turn buttons browse the puzzles. **Reset** restores the current puzzle's
-FEN; **Flip** changes the viewing side. Each newly selected puzzle automatically
-faces the color whose turn is recorded in the FEN. Solutions are loaded but
-are not yet checked or revealed. The old `positions.fen` file is no longer read.
+FEN and restarts its solution; **Flip** changes only the viewing side. Each newly
+selected puzzle automatically faces the color whose turn is recorded in the FEN.
+Solver moves are checked against the stored UCI line. Correct moves are accepted,
+wrong moves are restored, stored opponent replies are applied automatically, and
+the final move shows **Solution complete**. The old `positions.fen` file is no
+longer read.
 
 ## Architecture
 

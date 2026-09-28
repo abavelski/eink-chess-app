@@ -1,6 +1,6 @@
 # Task 01 — Check puzzle solutions
 
-**Status:** Ready  
+**Status:** Implemented  
 **Depends on:** nothing  
 **Primary files:** `src/board.rs`, `src/main.rs`, tests in those modules
 
