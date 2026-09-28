@@ -1452,10 +1452,9 @@ mod tests {
     fn startup_lists_collections_and_filters_keys_deterministically() {
         let mut runner = new_runner();
         let commands = runner.start();
-        assert!(commands.iter().any(|command| matches!(
-            command,
-            Command::Store(StoreRequest::List)
-        )));
+        assert!(commands
+            .iter()
+            .any(|command| matches!(command, Command::Store(StoreRequest::List))));
 
         runner.store_result(StoreResult::Keys(vec![
             "notes.json".into(),
