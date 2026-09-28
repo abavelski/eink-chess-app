@@ -907,20 +907,20 @@ mod tests {
 
     #[test]
     fn puzzle_feedback_toolbar_and_promotion_modal_fit_the_kobo_panel() {
-        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        let (mut layout_runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let feedback_states = [
             None,
             Some(SolutionFeedback::Correct),
             Some(SolutionFeedback::Wrong),
             Some(SolutionFeedback::Complete),
         ];
-        for index in 0..runner.app().puzzles.len() {
-            runner.app_mut().select_puzzle(index);
+        for index in 0..layout_runner.app().puzzles.len() {
+            layout_runner.app_mut().select_puzzle(index);
             for feedback in feedback_states {
-                runner.app_mut().solution_feedback = feedback;
-                let screen = runner.app().screen();
+                layout_runner.app_mut().solution_feedback = feedback;
+                let screen = layout_runner.app().screen();
                 let diagnostics =
-                    screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+                    screen.diagnostics(&layout_runner.context().metrics(), &Chrome::measuring(false));
                 assert!(
                     !diagnostics.has_errors(),
                     "puzzle {index}, feedback {feedback:?}: {:?}",
