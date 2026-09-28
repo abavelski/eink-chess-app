@@ -194,11 +194,7 @@ impl ChessBoardApp {
         self.show(context);
     }
 
-    fn update_collection_metadata(
-        &mut self,
-        key: &str,
-        parsed: &Result<PuzzleCollection, String>,
-    ) {
+    fn update_collection_metadata(&mut self, key: &str, parsed: &Result<PuzzleCollection, String>) {
         let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) else {
             return;
         };
@@ -599,7 +595,8 @@ impl KoboApp for ChessBoardApp {
             CollectionLoadKind::Initial => match parsed {
                 Ok(collection) => {
                     let title = collection.title.clone();
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
                         entry.title = title;
                         entry.valid = true;
                         entry.error = None;
@@ -608,7 +605,8 @@ impl KoboApp for ChessBoardApp {
                     self.show(context);
                 }
                 Err(error) => {
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
                         entry.valid = false;
                         entry.error = Some(error.clone());
                     }
@@ -621,7 +619,8 @@ impl KoboApp for ChessBoardApp {
             CollectionLoadKind::Selection => match parsed {
                 Ok(collection) => {
                     let title = collection.title.clone();
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
                         entry.title = title;
                         entry.valid = true;
                         entry.error = None;
@@ -630,7 +629,8 @@ impl KoboApp for ChessBoardApp {
                     self.show(context);
                 }
                 Err(error) => {
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
                         entry.valid = false;
                         entry.error = Some(error.clone());
                     }
@@ -951,10 +951,9 @@ mod tests {
             None => {
                 let mut runner = new_runner();
                 let mut commands = runner.start();
-                assert!(commands.iter().any(|command| matches!(
-                    command,
-                    Command::Store(StoreRequest::List)
-                )));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, Command::Store(StoreRequest::List))));
 
                 let next = runner.store_result(StoreResult::Keys(Vec::new()));
                 assert!(next.iter().any(|command| matches!(
@@ -967,14 +966,12 @@ mod tests {
                 let next = runner.store_result(StoreResult::Saved {
                     key: PUZZLES_FILE.into(),
                 });
-                assert!(next.iter().any(|command| matches!(
-                    command,
-                    Command::Store(StoreRequest::List)
-                )));
+                assert!(next
+                    .iter()
+                    .any(|command| matches!(command, Command::Store(StoreRequest::List))));
                 commands.extend(next);
 
-                let next =
-                    runner.store_result(StoreResult::Keys(vec![PUZZLES_FILE.to_owned()]));
+                let next = runner.store_result(StoreResult::Keys(vec![PUZZLES_FILE.to_owned()]));
                 commands.extend(next);
 
                 let next = runner.store_result(StoreResult::Loaded {
@@ -999,10 +996,9 @@ mod tests {
     ) -> (AppRunner<ChessBoardApp>, Vec<Command>) {
         let mut runner = new_runner();
         let mut commands = runner.start();
-        assert!(commands.iter().any(|command| matches!(
-            command,
-            Command::Store(StoreRequest::List)
-        )));
+        assert!(commands
+            .iter()
+            .any(|command| matches!(command, Command::Store(StoreRequest::List))));
 
         let keys = files.iter().map(|(key, _)| (*key).to_owned()).collect();
         let next = runner.store_result(StoreResult::Keys(keys));
@@ -1488,7 +1484,10 @@ mod tests {
             command, Command::Store(StoreRequest::Save { key, value })
                 if key == PUZZLES_FILE && value.as_slice() == EXAMPLE_PUZZLES
         )));
-        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some(PUZZLES_FILE)
+        );
         assert_eq!(runner.app().puzzles.len(), 10);
         assert!(runner.app().file_error.is_none());
     }
@@ -1512,7 +1511,10 @@ mod tests {
             (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
             ("puzzles-endgames.json", ALT_PUZZLES.to_vec()),
         ]);
-        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some(PUZZLES_FILE)
+        );
         let initial_board = runner.app().board.clone();
 
         let index = runner
@@ -1688,21 +1690,27 @@ mod tests {
         ]);
         picker_runner.action(action_id(PUZZLE_PICKER));
         let screen = picker_runner.app().screen();
-        let diagnostics =
-            screen.diagnostics(&picker_runner.context().metrics(), &Chrome::measuring(false));
+        let diagnostics = screen.diagnostics(
+            &picker_runner.context().metrics(),
+            &Chrome::measuring(false),
+        );
         assert!(
             !diagnostics.has_errors(),
             "collection picker: {:?}",
             diagnostics.issues
         );
         for index in 0..picker_runner.app().collections.len() {
-            assert!(diagnostics.layout.nodes.iter().any(|node| {
-                node.kind.acts_on() == Some(action_id(&collection_action(index)))
-            }));
+            assert!(diagnostics
+                .layout
+                .nodes
+                .iter()
+                .any(|node| { node.kind.acts_on() == Some(action_id(&collection_action(index))) }));
         }
-        assert!(diagnostics.layout.nodes.iter().any(|node| {
-            node.kind.acts_on() == Some(action_id(PUZZLE_PICKER_CANCEL))
-        }));
+        assert!(diagnostics
+            .layout
+            .nodes
+            .iter()
+            .any(|node| { node.kind.acts_on() == Some(action_id(PUZZLE_PICKER_CANCEL)) }));
     }
 }
 
