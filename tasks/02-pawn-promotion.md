@@ -1,6 +1,6 @@
 # Task 02 — Pawn promotion
 
-**Status:** Ready  
+**Status:** Implemented  
 **Depends on:** Task 01  
 **Primary files:** `src/board.rs`, `src/main.rs`, possibly a small reusable dialog/state type
 

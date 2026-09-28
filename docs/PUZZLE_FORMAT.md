@@ -69,10 +69,16 @@ opponent ply is applied automatically, and the app then waits for the next
 solver move. A wrong move is restored immediately and does not advance the
 solution. Finishing the sequence shows **Solution complete**.
 
-This is solution matching, not chess-rule enforcement: the app still does not
-decide whether a move is legal, whether a king is in check, or whether a
-position is checkmate. Promotion UCI such as `a7a8q` is already accepted by the
-file parser, but choosing a promotion piece on the board is a later task.
+This is solution matching, not general chess-rule enforcement: the app still
+does not decide whether an ordinary move is legal, whether a king is in check,
+or whether a position is checkmate.
+
+Pawn promotion is implemented. When a pawn is moved to its last rank, the board
+does not change until the user chooses **Queen**, **Rook**, **Bishop**, or
+**Knight** in the promotion dialog. The selected piece is appended to UCI as
+`q`, `r`, `b`, or `n` before solution checking. Cancel leaves the pawn on
+its original square. Stored opponent promotion replies are applied
+automatically without opening the dialog.
 
 ## Missing or invalid files
 

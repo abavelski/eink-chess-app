@@ -14,6 +14,11 @@ const CELLS: usize = SIDE * SIDE;
 const RESET: &str = "reset";
 const FLIP: &str = "flip";
 const EXIT: &str = "exit";
+const PROMOTE_QUEEN: &str = "promote-queen";
+const PROMOTE_ROOK: &str = "promote-rook";
+const PROMOTE_BISHOP: &str = "promote-bishop";
+const PROMOTE_KNIGHT: &str = "promote-knight";
+const PROMOTION_CANCEL: &str = "promotion-cancel";
 const PUZZLES_FILE: &str = "puzzles.json";
 const EXAMPLE_PUZZLES: &[u8] = include_bytes!("../examples/puzzles.json");
 
@@ -24,6 +29,20 @@ enum SolutionFeedback {
     Complete,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PendingPromotion {
+    before: Board,
+    from: usize,
+    to: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct UciMove {
+    from: usize,
+    to: usize,
+    promotion: Option<PieceKind>,
+}
+
 #[derive(Default)]
 struct ChessBoardApp {
     board: Board,
@@ -31,6 +50,7 @@ struct ChessBoardApp {
     puzzle_index: usize,
     solution_ply: usize,
     solution_feedback: Option<SolutionFeedback>,
+    pending_promotion: Option<PendingPromotion>,
     file_error: Option<String>,
     sleeping: bool,
     flipped: bool,
@@ -63,6 +83,7 @@ impl ChessBoardApp {
     fn reset_attempt(&mut self) {
         self.solution_ply = 0;
         self.solution_feedback = None;
+        self.pending_promotion = None;
     }
 
     fn show(&self, context: &mut Context) {
@@ -149,6 +170,23 @@ impl ChessBoardApp {
         if let Some(error) = self.file_error.as_ref() {
             screen = screen.text(error.clone());
         }
+
+        if self.pending_promotion.is_some() {
+            screen = screen.modal("Promote pawn", |modal| {
+                modal
+                    .choose(
+                        "Choose promotion piece",
+                        [
+                            (PROMOTE_QUEEN, "Queen"),
+                            (PROMOTE_ROOK, "Rook"),
+                            (PROMOTE_BISHOP, "Bishop"),
+                            (PROMOTE_KNIGHT, "Knight"),
+                        ],
+                    )
+                    .button(PROMOTION_CANCEL, "Cancel")
+            });
+        }
+
         screen.build()
     }
 
@@ -168,7 +206,9 @@ impl ChessBoardApp {
     }
 
     fn handle_square_tap(&mut self, square: usize) -> bool {
-        if self.solution_feedback == Some(SolutionFeedback::Complete) {
+        if self.solution_feedback == Some(SolutionFeedback::Complete)
+            || self.pending_promotion.is_some()
+        {
             return false;
         }
 
@@ -177,13 +217,44 @@ impl ChessBoardApp {
             TapResult::NoChange => false,
             TapResult::SelectionChanged => true,
             TapResult::Moved { from, to } => {
-                self.check_solver_move(before, from, to);
+                let attempted = uci_move(from, to, None);
+                self.check_solver_move(before, &attempted);
+                true
+            }
+            TapResult::Promotion { from, to, .. } => {
+                self.pending_promotion = Some(PendingPromotion { before, from, to });
                 true
             }
         }
     }
 
-    fn check_solver_move(&mut self, before: Board, from: usize, to: usize) {
+    fn finish_promotion(&mut self, kind: PieceKind) {
+        let Some(pending) = self.pending_promotion.take() else {
+            return;
+        };
+        let before = pending.before;
+        self.board = before.clone();
+        self.board.clear_selection();
+        if !self.board.promote_pawn(pending.from, pending.to, kind) {
+            self.board = before;
+            self.board.clear_selection();
+            self.file_error = Some("The staged pawn promotion could not be applied.".into());
+            return;
+        }
+
+        let attempted = uci_move(pending.from, pending.to, Some(kind));
+        self.check_solver_move(before, &attempted);
+    }
+
+    fn cancel_promotion(&mut self) {
+        let Some(pending) = self.pending_promotion.take() else {
+            return;
+        };
+        self.board = pending.before;
+        self.board.clear_selection();
+    }
+
+    fn check_solver_move(&mut self, before: Board, attempted: &str) {
         let original_ply = self.solution_ply;
         let expected = self
             .puzzles
@@ -196,7 +267,7 @@ impl ChessBoardApp {
             return;
         };
 
-        if uci_move(from, to) != expected {
+        if attempted != expected {
             self.restore_wrong_move(before);
             return;
         }
@@ -210,11 +281,7 @@ impl ChessBoardApp {
             .cloned();
 
         if let Some(reply) = reply {
-            let Some((reply_from, reply_to)) = uci_squares(&reply) else {
-                self.restore_invalid_reply(before, original_ply, &reply);
-                return;
-            };
-            if !self.board.move_piece(reply_from, reply_to) {
+            if !self.apply_stored_move(&reply) {
                 self.restore_invalid_reply(before, original_ply, &reply);
                 return;
             }
@@ -230,6 +297,16 @@ impl ChessBoardApp {
         } else {
             SolutionFeedback::Correct
         });
+    }
+
+    fn apply_stored_move(&mut self, movement: &str) -> bool {
+        let Some(movement) = parse_uci_move(movement) else {
+            return false;
+        };
+        match movement.promotion {
+            Some(kind) => self.board.promote_pawn(movement.from, movement.to, kind),
+            None => self.board.move_piece(movement.from, movement.to),
+        }
     }
 
     fn restore_wrong_move(&mut self, before: Board) {
@@ -288,6 +365,17 @@ impl KoboApp for ChessBoardApp {
     }
 
     fn on_action(&mut self, context: &mut Context, action: ActionId) {
+        if self.pending_promotion.is_some() {
+            if action == action_id(PROMOTION_CANCEL) {
+                self.cancel_promotion();
+                self.show(context);
+            } else if let Some(kind) = promotion_kind_for_action(action) {
+                self.finish_promotion(kind);
+                self.show(context);
+            }
+            return;
+        }
+
         if action == action_id(EXIT) {
             context.exit();
             return;
@@ -318,7 +406,9 @@ impl KoboApp for ChessBoardApp {
     }
 
     fn on_page_turn(&mut self, context: &mut Context, forward: bool) {
-        self.turn_puzzle(context, forward);
+        if self.pending_promotion.is_none() {
+            self.turn_puzzle(context, forward);
+        }
     }
 
     fn on_suspend(&mut self, context: &mut Context) {
@@ -362,11 +452,15 @@ fn square_from_name(name: &str) -> Option<usize> {
     Some(rank_from_top * SIDE + file)
 }
 
-fn uci_move(from: usize, to: usize) -> String {
-    format!("{}{}", square_name(from), square_name(to))
+fn uci_move(from: usize, to: usize, promotion: Option<PieceKind>) -> String {
+    let mut movement = format!("{}{}", square_name(from), square_name(to));
+    if let Some(kind) = promotion {
+        movement.push(promotion_suffix(kind).expect("only promotable piece kinds reach UCI"));
+    }
+    movement
 }
 
-fn uci_squares(movement: &str) -> Option<(usize, usize)> {
+fn parse_uci_move(movement: &str) -> Option<UciMove> {
     let bytes = movement.as_bytes();
     if bytes.len() != 4 && bytes.len() != 5 {
         return None;
@@ -377,7 +471,50 @@ fn uci_squares(movement: &str) -> Option<(usize, usize)> {
     let to = std::str::from_utf8(&bytes[2..4])
         .ok()
         .and_then(square_from_name)?;
-    Some((from, to))
+    let promotion = if bytes.len() == 5 {
+        Some(promotion_kind(bytes[4])?)
+    } else {
+        None
+    };
+    Some(UciMove {
+        from,
+        to,
+        promotion,
+    })
+}
+
+const fn promotion_kind(suffix: u8) -> Option<PieceKind> {
+    match suffix {
+        b'q' => Some(PieceKind::Queen),
+        b'r' => Some(PieceKind::Rook),
+        b'b' => Some(PieceKind::Bishop),
+        b'n' => Some(PieceKind::Knight),
+        _ => None,
+    }
+}
+
+const fn promotion_suffix(kind: PieceKind) -> Option<char> {
+    match kind {
+        PieceKind::Queen => Some('q'),
+        PieceKind::Rook => Some('r'),
+        PieceKind::Bishop => Some('b'),
+        PieceKind::Knight => Some('n'),
+        PieceKind::Pawn | PieceKind::King => None,
+    }
+}
+
+fn promotion_kind_for_action(action: ActionId) -> Option<PieceKind> {
+    if action == action_id(PROMOTE_QUEEN) {
+        Some(PieceKind::Queen)
+    } else if action == action_id(PROMOTE_ROOK) {
+        Some(PieceKind::Rook)
+    } else if action == action_id(PROMOTE_BISHOP) {
+        Some(PieceKind::Bishop)
+    } else if action == action_id(PROMOTE_KNIGHT) {
+        Some(PieceKind::Knight)
+    } else {
+        None
+    }
 }
 
 fn square_label(square: usize, piece: Option<Piece>) -> String {
@@ -427,6 +564,8 @@ mod tests {
     use super::*;
     use kobo_sdk::{AppRunner, Chrome, Command, DisplayMetrics, StoreRequest};
 
+    const PROMOTION_PUZZLES: &[u8] = include_bytes!("../examples/promotion-puzzles.json");
+
     fn runner(bytes: Option<Vec<u8>>) -> (AppRunner<ChessBoardApp>, Vec<Command>) {
         let mut runner = AppRunner::with_metrics(
             ChessBoardApp::default(),
@@ -448,9 +587,22 @@ mod tests {
     }
 
     fn play(runner: &mut AppRunner<ChessBoardApp>, movement: &str) {
-        let (from, to) = uci_squares(movement).expect("valid test UCI");
-        runner.action(action_id(&square_action(from)));
-        runner.action(action_id(&square_action(to)));
+        let movement = parse_uci_move(movement).expect("valid test UCI");
+        runner.action(action_id(&square_action(movement.from)));
+        runner.action(action_id(&square_action(movement.to)));
+        if let Some(kind) = movement.promotion {
+            runner.action(action_id(promotion_action(kind)));
+        }
+    }
+
+    fn promotion_action(kind: PieceKind) -> &'static str {
+        match kind {
+            PieceKind::Queen => PROMOTE_QUEEN,
+            PieceKind::Rook => PROMOTE_ROOK,
+            PieceKind::Bishop => PROMOTE_BISHOP,
+            PieceKind::Knight => PROMOTE_KNIGHT,
+            PieceKind::Pawn | PieceKind::King => panic!("not a promotion piece"),
+        }
     }
 
     #[test]
@@ -462,23 +614,49 @@ mod tests {
         assert_eq!(square_label(0, None), "a8");
         assert_eq!(square_label(CELLS - 1, None), "h1");
 
-        let (from, to) = uci_squares("e2e4").unwrap();
-        assert_eq!(uci_move(from, to), "e2e4");
+        let movement = parse_uci_move("e2e4").unwrap();
+        assert_eq!(
+            uci_move(movement.from, movement.to, movement.promotion),
+            "e2e4"
+        );
         let flipped_from = (0..CELLS)
-            .find(|&display| board_square(display, true) == from)
+            .find(|&display| board_square(display, true) == movement.from)
             .unwrap();
         let flipped_to = (0..CELLS)
-            .find(|&display| board_square(display, true) == to)
+            .find(|&display| board_square(display, true) == movement.to)
             .unwrap();
-        assert_ne!(flipped_from, from);
-        assert_ne!(flipped_to, to);
+        assert_ne!(flipped_from, movement.from);
+        assert_ne!(flipped_to, movement.to);
         assert_eq!(
             uci_move(
                 board_square(flipped_from, true),
-                board_square(flipped_to, true)
+                board_square(flipped_to, true),
+                None
             ),
             "e2e4"
         );
+    }
+
+    #[test]
+    fn promotion_uci_supports_all_standard_suffixes() {
+        let from = square_from_name("a7").unwrap();
+        let to = square_from_name("a8").unwrap();
+        for (kind, expected) in [
+            (PieceKind::Queen, "a7a8q"),
+            (PieceKind::Rook, "a7a8r"),
+            (PieceKind::Bishop, "a7a8b"),
+            (PieceKind::Knight, "a7a8n"),
+        ] {
+            assert_eq!(uci_move(from, to, Some(kind)), expected);
+            assert_eq!(
+                parse_uci_move(expected),
+                Some(UciMove {
+                    from,
+                    to,
+                    promotion: Some(kind),
+                })
+            );
+        }
     }
 
     #[test]
@@ -555,9 +733,112 @@ mod tests {
     }
 
     #[test]
-    fn changing_puzzles_clears_transient_solution_feedback() {
-        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
-        play(&mut runner, "d7e8");
+    fn cancelling_promotion_leaves_board_and_attempt_unchanged() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        let initial = runner.app().board.clone();
+
+        let movement = parse_uci_move("a7a8q").unwrap();
+        runner.action(action_id(&square_action(movement.from)));
+        runner.action(action_id(&square_action(movement.to)));
+        assert!(runner.app().pending_promotion.is_some());
+        assert_eq!(runner.app().board.piece_at(movement.from), initial.piece_at(movement.from));
+        assert_eq!(runner.app().board.piece_at(movement.to), initial.piece_at(movement.to));
+
+        runner.action(action_id(PROMOTION_CANCEL));
+
+        assert_eq!(runner.app().board, initial);
+        assert!(runner.app().pending_promotion.is_none());
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(runner.app().solution_feedback, None);
+    }
+
+    #[test]
+    fn wrong_underpromotion_is_rejected_and_correct_one_completes() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        runner.page_turn(true);
+        let initial = runner.app().board.clone();
+
+        let movement = parse_uci_move("b7b8n").unwrap();
+        runner.action(action_id(&square_action(movement.from)));
+        runner.action(action_id(&square_action(movement.to)));
+        runner.action(action_id(PROMOTE_QUEEN));
+
+        assert_eq!(runner.app().board, initial);
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Wrong)
+        );
+
+        play(&mut runner, "b7b8n");
+        assert_eq!(
+            runner.app().board.piece_at(square_from_name("b8").unwrap()),
+            Some(Piece {
+                color: Color::White,
+                kind: PieceKind::Knight,
+            })
+        );
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Complete)
+        );
+    }
+
+    #[test]
+    fn black_pawn_can_promote_to_an_underpromotion_piece() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        runner.page_turn(true);
+        runner.page_turn(true);
+
+        play(&mut runner, "h2h1r");
+
+        assert_eq!(
+            runner.app().board.piece_at(square_from_name("h1").unwrap()),
+            Some(Piece {
+                color: Color::Black,
+                kind: PieceKind::Rook,
+            })
+        );
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Complete)
+        );
+    }
+
+    #[test]
+    fn automatic_opponent_promotion_applies_without_opening_modal() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        for _ in 0..3 {
+            runner.page_turn(true);
+        }
+
+        play(&mut runner, "h2h3");
+
+        assert!(runner.app().pending_promotion.is_none());
+        assert_eq!(runner.app().solution_ply, 2);
+        assert_eq!(
+            runner.app().board.piece_at(square_from_name("a1").unwrap()),
+            Some(Piece {
+                color: Color::Black,
+                kind: PieceKind::Queen,
+            })
+        );
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Correct)
+        );
+    }
+
+    #[test]
+    fn changing_puzzles_clears_transient_solution_feedback_and_promotion() {
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        let movement = parse_uci_move("a7a8q").unwrap();
+        runner.action(action_id(&square_action(movement.from)));
+        runner.action(action_id(&square_action(movement.to)));
+        assert!(runner.app().pending_promotion.is_some());
+
+        runner.action(action_id(PROMOTION_CANCEL));
+        play(&mut runner, "a7a8q");
         assert_eq!(
             runner.app().solution_feedback,
             Some(SolutionFeedback::Complete)
@@ -568,6 +849,7 @@ mod tests {
         assert_eq!(runner.app().puzzle_index, 1);
         assert_eq!(runner.app().solution_ply, 0);
         assert_eq!(runner.app().solution_feedback, None);
+        assert!(runner.app().pending_promotion.is_none());
     }
 
     #[test]
@@ -624,7 +906,7 @@ mod tests {
     }
 
     #[test]
-    fn puzzle_feedback_and_toolbar_fit_the_kobo_panel() {
+    fn puzzle_feedback_toolbar_and_promotion_modal_fit_the_kobo_panel() {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let feedback_states = [
             None,
@@ -673,6 +955,34 @@ mod tests {
                     );
                 }
             }
+        }
+
+        let (mut runner, _) = runner(Some(PROMOTION_PUZZLES.to_vec()));
+        let movement = parse_uci_move("a7a8q").unwrap();
+        runner.action(action_id(&square_action(movement.from)));
+        runner.action(action_id(&square_action(movement.to)));
+        let screen = runner.app().screen();
+        let diagnostics = screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert!(
+            !diagnostics.has_errors(),
+            "promotion modal: {:?}",
+            diagnostics.issues
+        );
+        for action in [
+            PROMOTE_QUEEN,
+            PROMOTE_ROOK,
+            PROMOTE_BISHOP,
+            PROMOTE_KNIGHT,
+            PROMOTION_CANCEL,
+        ] {
+            assert!(
+                diagnostics
+                    .layout
+                    .nodes
+                    .iter()
+                    .any(|node| node.kind.acts_on() == Some(action_id(action))),
+                "{action} should have a touch target"
+            );
         }
     }
 }

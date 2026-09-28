@@ -26,6 +26,7 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - show explicit Correct / Wrong / Solution complete feedback
 - automatically apply stored opponent replies between solver moves
 - reject a wrong move and restore the previous position
+- choose Queen, Rook, Bishop, or Knight when a pawn reaches the last rank
 - touch the selected piece again to deselect it
 - reset the board and solution attempt to the current FEN position
 - return cleanly to the Kobo reader
