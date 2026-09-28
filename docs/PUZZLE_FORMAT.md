@@ -1,16 +1,21 @@
 # Puzzle files (version 1)
 
 Use JSON: it has standard parsers, is easy to generate, and keeps solution
-moves and descriptions together. The app reads one UTF-8 file on each launch:
+moves and descriptions together. The app discovers UTF-8 puzzle collections in:
 
 ```text
-KOBOeReader/.adds/cobalt/state/eink-chess/puzzles.json
+KOBOeReader/.adds/cobalt/state/eink-chess/
 ```
 
-Close E-Ink Chess, connect the Kobo by USB, and copy or edit this file. Eject the
-reader before disconnecting, then reopen the app. No rebuild is needed to
-change the puzzles. The file must be no larger than 256 KiB (Cobalt's store
-limit). Use ordinary JSON without comments or trailing commas.
+The backward-compatible default collection is `puzzles.json`. Additional
+collections must use `puzzles-<name>.json`, for example
+`puzzles-endgames.json` or `puzzles-mate-in-two.json`. Files with other names
+are ignored by the collection picker.
+
+Close E-Ink Chess, connect the Kobo by USB, and copy or edit the files. Eject
+the reader before disconnecting, then reopen the app. No rebuild is needed.
+Each file must be no larger than 256 KiB (Cobalt's store limit). Use ordinary
+JSON without comments or trailing commas.
 
 ## Example
 
@@ -29,9 +34,11 @@ limit). Use ordinary JSON without comments or trailing commas.
 }
 ```
 
-The root requires `version: 1` and a nonempty `puzzles` array. Puzzles appear in
-array order. Optional collection metadata such as `title`, `source`, and
-`license` is retained in the file and ignored by the current app.
+The root requires `version: 1` and a nonempty `puzzles` array. Puzzles appear
+in array order. Optional `title` is used as the collection name in the
+on-device **Puzzles** picker; if it is missing or blank, the filename is shown.
+Other collection metadata such as `source` and `license` is ignored by the
+current app.
 
 | Puzzle field | Required | Meaning |
 | --- | --- | --- |
@@ -87,12 +94,24 @@ current FEN, Flip still changes orientation, and page buttons still browse
 puzzles. Returning from Free board to Solution restores the puzzle FEN and
 restarts its solution while preserving the current orientation.
 
-## Missing or invalid files
+## Multiple collections, missing files, and invalid files
 
-If `puzzles.json` is missing, the app saves and loads the bundled examples.
-If the file is invalid, the app shows an error and displays the examples
-without replacing the invalid file. Fix it over USB and relaunch. Existing
-`positions.fen` files are left in place but are no longer loaded.
+At startup the app lists keys matching `puzzles.json` or
+`puzzles-<name>.json`, sorts them by filename, and reads their metadata for the
+picker. If valid, `puzzles.json` is the preferred initial collection;
+otherwise the first valid discovered collection is used.
+
+Press **Puzzles** to switch collections. A successful switch opens the selected
+file at its first puzzle. If a selected file is missing, unreadable, or invalid,
+the current collection and board stay active and an error names the file that
+failed. Uploaded files are never rewritten just because parsing failed.
+
+If no matching puzzle collection exists at all, the app creates and loads the
+bundled examples as `puzzles.json`. If matching files exist but none are valid,
+the app shows the bundled examples in memory while leaving the uploaded files
+untouched so they can be fixed over USB.
+
+Existing `positions.fen` files are left in place but are no longer loaded.
 
 ## Lichess imports
 

@@ -6,8 +6,8 @@ use kobo_sdk::{
     action_id, ActionId, BandAlign, BannerLevel, Context, Glyph, KoboApp, Screen, ScreenBuilder,
     SlotWidth, StoreResult,
 };
-use puzzle::{parse_puzzle_file, Puzzle};
-use std::process::ExitCode;
+use puzzle::{parse_puzzle_file, Puzzle, PuzzleCollection};
+use std::{collections::VecDeque, process::ExitCode};
 
 const SIDE: usize = 8;
 const CELLS: usize = SIDE * SIDE;
@@ -16,6 +16,9 @@ const FLIP: &str = "flip";
 const EXIT: &str = "exit";
 const MODE_SOLUTION: &str = "mode-solution";
 const MODE_FREE_BOARD: &str = "mode-free-board";
+const PUZZLE_PICKER: &str = "puzzle-picker";
+const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
+const COLLECTION_ACTION_PREFIX: &str = "collection-";
 const PROMOTE_QUEEN: &str = "promote-queen";
 const PROMOTE_ROOK: &str = "promote-rook";
 const PROMOTE_BISHOP: &str = "promote-bishop";
@@ -52,6 +55,27 @@ struct UciMove {
     promotion: Option<PieceKind>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CollectionEntry {
+    key: String,
+    title: Option<String>,
+    valid: bool,
+    error: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CollectionLoadKind {
+    Metadata,
+    Initial,
+    Selection,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CollectionLoad {
+    key: String,
+    kind: CollectionLoadKind,
+}
+
 #[derive(Default)]
 struct ChessBoardApp {
     board: Board,
@@ -61,25 +85,135 @@ struct ChessBoardApp {
     solution_feedback: Option<SolutionFeedback>,
     mode: BoardMode,
     pending_promotion: Option<PendingPromotion>,
+    collections: Vec<CollectionEntry>,
+    active_collection: Option<String>,
+    collection_load: Option<CollectionLoad>,
+    metadata_queue: VecDeque<String>,
+    picker_open: bool,
+    creating_default: bool,
     file_error: Option<String>,
     sleeping: bool,
     flipped: bool,
 }
 
 impl ChessBoardApp {
-    fn activate_puzzles(&mut self, context: &mut Context, puzzles: Vec<Puzzle>, save_copy: bool) {
-        self.puzzles = puzzles;
+    fn activate_collection(&mut self, key: Option<String>, collection: PuzzleCollection) {
+        self.puzzles = collection.puzzles;
+        self.active_collection = key;
+        self.file_error = None;
         self.select_puzzle(0);
-        if save_copy {
+    }
+
+    fn show_examples_fallback(&mut self, error: impl Into<String>) {
+        let collection =
+            parse_puzzle_file(EXAMPLE_PUZZLES).expect("bundled example puzzles are valid");
+        self.activate_collection(None, collection);
+        self.file_error = Some(error.into());
+    }
+
+    fn begin_collection_discovery(&mut self, context: &mut Context, keys: Vec<String>) {
+        let mut keys = keys
+            .into_iter()
+            .filter(|key| is_puzzle_collection_key(key))
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys.dedup();
+
+        self.collections = keys
+            .iter()
+            .map(|key| CollectionEntry {
+                key: key.clone(),
+                title: None,
+                valid: false,
+                error: None,
+            })
+            .collect();
+        self.metadata_queue = keys.into();
+        self.collection_load = None;
+
+        if self.collections.is_empty() {
+            self.creating_default = true;
             context.store().save(PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec());
+        } else {
+            self.load_next_metadata(context);
         }
+    }
+
+    fn load_next_metadata(&mut self, context: &mut Context) {
+        if let Some(key) = self.metadata_queue.pop_front() {
+            self.collection_load = Some(CollectionLoad {
+                key: key.clone(),
+                kind: CollectionLoadKind::Metadata,
+            });
+            context.store().load(key);
+        } else {
+            self.load_initial_collection(context);
+        }
+    }
+
+    fn load_initial_collection(&mut self, context: &mut Context) {
+        let preferred = self
+            .collections
+            .iter()
+            .find(|entry| entry.key == PUZZLES_FILE && entry.valid)
+            .or_else(|| self.collections.iter().find(|entry| entry.valid))
+            .map(|entry| entry.key.clone());
+
+        let Some(key) = preferred else {
+            self.collection_load = None;
+            self.show_examples_fallback(
+                "No valid puzzle collection could be loaded; showing bundled examples.",
+            );
+            self.show(context);
+            return;
+        };
+
+        self.collection_load = Some(CollectionLoad {
+            key: key.clone(),
+            kind: CollectionLoadKind::Initial,
+        });
+        context.store().load(key);
+    }
+
+    fn request_collection(&mut self, context: &mut Context, key: String) {
+        self.picker_open = false;
+        if self.active_collection.as_deref() == Some(key.as_str()) {
+            self.show(context);
+            return;
+        }
+        if self.collection_load.is_some() {
+            return;
+        }
+
+        self.file_error = None;
+        self.collection_load = Some(CollectionLoad {
+            key: key.clone(),
+            kind: CollectionLoadKind::Selection,
+        });
+        context.store().load(key);
         self.show(context);
     }
 
-    fn load_examples(&mut self, context: &mut Context, save_copy: bool) {
-        let puzzles =
-            parse_puzzle_file(EXAMPLE_PUZZLES).expect("bundled example puzzles are valid");
-        self.activate_puzzles(context, puzzles, save_copy);
+    fn update_collection_metadata(
+        &mut self,
+        key: &str,
+        parsed: &Result<PuzzleCollection, String>,
+    ) {
+        let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) else {
+            return;
+        };
+        match parsed {
+            Ok(collection) => {
+                entry.title = collection.title.clone();
+                entry.valid = true;
+                entry.error = None;
+            }
+            Err(error) => {
+                entry.title = None;
+                entry.valid = false;
+                entry.error = Some(error.clone());
+            }
+        }
     }
 
     fn select_puzzle(&mut self, index: usize) {
@@ -142,7 +276,8 @@ impl ChessBoardApp {
                 [
                     (
                         SlotWidth::Fill,
-                        (|slot: ScreenBuilder| slot) as fn(ScreenBuilder) -> ScreenBuilder,
+                        (|slot: ScreenBuilder| slot.button(PUZZLE_PICKER, "Puzzles"))
+                            as fn(ScreenBuilder) -> ScreenBuilder,
                     ),
                     (
                         // Two 10 mm targets with the grid's 1 mm gap.
@@ -207,6 +342,21 @@ impl ChessBoardApp {
                         ],
                     )
                     .button(PROMOTION_CANCEL, "Cancel")
+            });
+        }
+
+        if self.picker_open {
+            screen = screen.modal("Puzzle collections", |modal| {
+                modal
+                    .rows(self.collections.iter().enumerate().map(|(index, entry)| {
+                        (
+                            collection_action(index),
+                            collection_display_name(entry),
+                            collection_summary(entry, self.active_collection.as_deref()),
+                            Glyph::Grid,
+                        )
+                    }))
+                    .button(PUZZLE_PICKER_CANCEL, "Cancel")
             });
         }
 
@@ -380,35 +530,114 @@ impl ChessBoardApp {
 
 impl KoboApp for ChessBoardApp {
     fn on_start(&mut self, context: &mut Context) {
-        context.store().load(PUZZLES_FILE);
+        context.store().list();
+    }
+
+    fn on_store(&mut self, context: &mut Context, result: StoreResult) {
+        match result {
+            StoreResult::Keys(keys) => self.begin_collection_discovery(context, keys),
+            StoreResult::Denied(error) => {
+                self.show_examples_fallback(format!(
+                    "Puzzle collections could not be listed ({error}); showing bundled examples."
+                ));
+                self.show(context);
+            }
+            _ => {}
+        }
+    }
+
+    fn on_save(&mut self, context: &mut Context, key: &str, result: StoreResult) {
+        if key != PUZZLES_FILE || !self.creating_default {
+            return;
+        }
+        self.creating_default = false;
+        match result {
+            StoreResult::Saved { .. } => context.store().list(),
+            StoreResult::Denied(error) => {
+                self.show_examples_fallback(format!(
+                    "The default puzzle collection could not be created ({error}); showing bundled examples."
+                ));
+                self.show(context);
+            }
+            _ => {
+                self.show_examples_fallback(
+                    "The default puzzle collection could not be created; showing bundled examples.",
+                );
+                self.show(context);
+            }
+        }
     }
 
     fn on_load(&mut self, context: &mut Context, key: &str, result: StoreResult) {
-        if key != PUZZLES_FILE {
+        let Some(load) = self.collection_load.take() else {
+            return;
+        };
+        if load.key != key {
+            self.show_examples_fallback(format!(
+                "Unexpected puzzle collection response for {key}; showing bundled examples."
+            ));
+            self.show(context);
             return;
         }
-        match result {
+
+        let parsed = match result {
             StoreResult::Loaded {
                 value: Some(bytes), ..
-            } => match parse_puzzle_file(&bytes) {
-                Ok(puzzles) => {
-                    self.file_error = None;
-                    self.activate_puzzles(context, puzzles, false);
+            } => parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}")),
+            StoreResult::Loaded { value: None, .. } => {
+                Err(format!("{key}: the puzzle collection no longer exists."))
+            }
+            StoreResult::Denied(error) => Err(format!("{key}: could not be read ({error}).")),
+            _ => Err(format!("{key}: unexpected store response.")),
+        };
+
+        match load.kind {
+            CollectionLoadKind::Metadata => {
+                self.update_collection_metadata(key, &parsed);
+                self.load_next_metadata(context);
+            }
+            CollectionLoadKind::Initial => match parsed {
+                Ok(collection) => {
+                    let title = collection.title.clone();
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                        entry.title = title;
+                        entry.valid = true;
+                        entry.error = None;
+                    }
+                    self.activate_collection(Some(key.to_owned()), collection);
+                    self.show(context);
                 }
                 Err(error) => {
-                    self.file_error = Some(error);
-                    self.load_examples(context, false);
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                        entry.valid = false;
+                        entry.error = Some(error.clone());
+                    }
+                    self.show_examples_fallback(format!(
+                        "{error} Showing bundled examples instead."
+                    ));
+                    self.show(context);
                 }
             },
-            StoreResult::Loaded { value: None, .. } => {
-                self.file_error = None;
-                self.load_examples(context, true);
-            }
-            StoreResult::Denied(_) => {
-                self.file_error = Some("puzzles.json could not be read; showing examples.".into());
-                self.load_examples(context, false);
-            }
-            _ => {}
+            CollectionLoadKind::Selection => match parsed {
+                Ok(collection) => {
+                    let title = collection.title.clone();
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                        entry.title = title;
+                        entry.valid = true;
+                        entry.error = None;
+                    }
+                    self.activate_collection(Some(key.to_owned()), collection);
+                    self.show(context);
+                }
+                Err(error) => {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+                        entry.valid = false;
+                        entry.error = Some(error.clone());
+                    }
+                    self.file_error = Some(error);
+                    self.show(context);
+                }
+            },
         }
     }
 
@@ -419,6 +648,30 @@ impl KoboApp for ChessBoardApp {
                 self.show(context);
             } else if let Some(kind) = promotion_kind_for_action(action) {
                 self.finish_promotion(kind);
+                self.show(context);
+            }
+            return;
+        }
+
+        if self.picker_open {
+            if action == action_id(PUZZLE_PICKER_CANCEL) {
+                self.picker_open = false;
+                self.show(context);
+                return;
+            }
+            for index in 0..self.collections.len() {
+                if action == action_id(&collection_action(index)) {
+                    let key = self.collections[index].key.clone();
+                    self.request_collection(context, key);
+                    return;
+                }
+            }
+            return;
+        }
+
+        if action == action_id(PUZZLE_PICKER) {
+            if self.collection_load.is_none() && !self.collections.is_empty() {
+                self.picker_open = true;
                 self.show(context);
             }
             return;
@@ -479,6 +732,42 @@ impl KoboApp for ChessBoardApp {
     fn on_resume(&mut self, context: &mut Context) {
         self.sleeping = false;
         self.show(context);
+    }
+}
+
+fn is_puzzle_collection_key(key: &str) -> bool {
+    key == PUZZLES_FILE
+        || key
+            .strip_prefix("puzzles-")
+            .and_then(|name| name.strip_suffix(".json"))
+            .is_some_and(|name| !name.is_empty())
+}
+
+fn collection_action(index: usize) -> String {
+    format!("{COLLECTION_ACTION_PREFIX}{index}")
+}
+
+fn collection_display_name(entry: &CollectionEntry) -> String {
+    entry
+        .title
+        .as_deref()
+        .filter(|title| !title.trim().is_empty())
+        .unwrap_or(&entry.key)
+        .to_owned()
+}
+
+fn collection_summary(entry: &CollectionEntry, active: Option<&str>) -> String {
+    let current = active == Some(entry.key.as_str());
+    if current && entry.title.is_some() {
+        format!("{} · current", entry.key)
+    } else if current {
+        "Current collection".into()
+    } else if !entry.valid {
+        format!("{} · could not be read", entry.key)
+    } else if entry.title.is_some() {
+        entry.key.clone()
+    } else {
+        String::new()
     }
 }
 
@@ -625,9 +914,27 @@ mod tests {
     use kobo_sdk::{AppRunner, Chrome, Command, DisplayMetrics, StoreRequest};
 
     const PROMOTION_PUZZLES: &[u8] = include_bytes!("../examples/promotion-puzzles.json");
+    const ALT_PUZZLES: &[u8] = br#"{
+      "version": 1,
+      "title": "Endgames",
+      "puzzles": [
+        {
+          "id": "end-1",
+          "fen": "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+          "description": "Endgame one.",
+          "solution": ["g6g7"]
+        },
+        {
+          "id": "end-2",
+          "fen": "8/8/8/8/8/5kq1/8/7K b - - 0 1",
+          "description": "Endgame two.",
+          "solution": ["g3g2"]
+        }
+      ]
+    }"#;
 
-    fn runner(bytes: Option<Vec<u8>>) -> (AppRunner<ChessBoardApp>, Vec<Command>) {
-        let mut runner = AppRunner::with_metrics(
+    fn new_runner() -> AppRunner<ChessBoardApp> {
+        AppRunner::with_metrics(
             ChessBoardApp::default(),
             DisplayMetrics {
                 width: 1264,
@@ -635,14 +942,110 @@ mod tests {
                 pixels_per_inch: 300,
                 ..DisplayMetrics::default()
             },
-        );
-        assert!(runner.start().iter().any(|command| matches!(
-            command, Command::Store(StoreRequest::Load { key }) if key == PUZZLES_FILE
+        )
+    }
+
+    fn runner(bytes: Option<Vec<u8>>) -> (AppRunner<ChessBoardApp>, Vec<Command>) {
+        match bytes {
+            Some(bytes) => runner_with_collections(vec![(PUZZLES_FILE, bytes)]),
+            None => {
+                let mut runner = new_runner();
+                let mut commands = runner.start();
+                assert!(commands.iter().any(|command| matches!(
+                    command,
+                    Command::Store(StoreRequest::List)
+                )));
+
+                let next = runner.store_result(StoreResult::Keys(Vec::new()));
+                assert!(next.iter().any(|command| matches!(
+                    command,
+                    Command::Store(StoreRequest::Save { key, value })
+                        if key == PUZZLES_FILE && value.as_slice() == EXAMPLE_PUZZLES
+                )));
+                commands.extend(next);
+
+                let next = runner.store_result(StoreResult::Saved {
+                    key: PUZZLES_FILE.into(),
+                });
+                assert!(next.iter().any(|command| matches!(
+                    command,
+                    Command::Store(StoreRequest::List)
+                )));
+                commands.extend(next);
+
+                let next =
+                    runner.store_result(StoreResult::Keys(vec![PUZZLES_FILE.to_owned()]));
+                commands.extend(next);
+
+                let next = runner.store_result(StoreResult::Loaded {
+                    key: PUZZLES_FILE.into(),
+                    value: Some(EXAMPLE_PUZZLES.to_vec()),
+                });
+                commands.extend(next);
+
+                let next = runner.store_result(StoreResult::Loaded {
+                    key: PUZZLES_FILE.into(),
+                    value: Some(EXAMPLE_PUZZLES.to_vec()),
+                });
+                commands.extend(next);
+
+                (runner, commands)
+            }
+        }
+    }
+
+    fn runner_with_collections(
+        files: Vec<(&str, Vec<u8>)>,
+    ) -> (AppRunner<ChessBoardApp>, Vec<Command>) {
+        let mut runner = new_runner();
+        let mut commands = runner.start();
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            Command::Store(StoreRequest::List)
         )));
-        let commands = runner.store_result(StoreResult::Loaded {
-            key: PUZZLES_FILE.into(),
-            value: bytes,
-        });
+
+        let keys = files.iter().map(|(key, _)| (*key).to_owned()).collect();
+        let next = runner.store_result(StoreResult::Keys(keys));
+        commands.extend(next);
+
+        let mut metadata_keys = files
+            .iter()
+            .map(|(key, _)| (*key).to_owned())
+            .filter(|key| is_puzzle_collection_key(key))
+            .collect::<Vec<_>>();
+        metadata_keys.sort();
+        metadata_keys.dedup();
+
+        for key in metadata_keys {
+            let bytes = files
+                .iter()
+                .find(|(candidate, _)| *candidate == key)
+                .map(|(_, bytes)| bytes.clone())
+                .expect("metadata key has bytes");
+            let next = runner.store_result(StoreResult::Loaded {
+                key,
+                value: Some(bytes),
+            });
+            commands.extend(next);
+        }
+
+        if let Some(CollectionLoad {
+            key,
+            kind: CollectionLoadKind::Initial,
+        }) = runner.app().collection_load.clone()
+        {
+            let bytes = files
+                .iter()
+                .find(|(candidate, _)| *candidate == key)
+                .map(|(_, bytes)| bytes.clone())
+                .expect("initial collection has bytes");
+            let next = runner.store_result(StoreResult::Loaded {
+                key,
+                value: Some(bytes),
+            });
+            commands.extend(next);
+        }
+
         (runner, commands)
     }
 
@@ -1050,18 +1453,142 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_creates_examples_but_invalid_file_is_preserved() {
-        let (_, commands) = runner(None);
+    fn startup_lists_collections_and_filters_keys_deterministically() {
+        let mut runner = new_runner();
+        let commands = runner.start();
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            Command::Store(StoreRequest::List)
+        )));
+
+        runner.store_result(StoreResult::Keys(vec![
+            "notes.json".into(),
+            "puzzles-z.json".into(),
+            "puzzles-.json".into(),
+            PUZZLES_FILE.into(),
+            "puzzles-a.json".into(),
+            "puzzles-a.json".into(),
+        ]));
+
+        assert_eq!(
+            runner
+                .app()
+                .collections
+                .iter()
+                .map(|entry| entry.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["puzzles-a.json", "puzzles-z.json", PUZZLES_FILE]
+        );
+    }
+
+    #[test]
+    fn missing_collections_create_and_load_default_examples() {
+        let (runner, commands) = runner(None);
         assert!(commands.iter().any(|command| matches!(
             command, Command::Store(StoreRequest::Save { key, value })
                 if key == PUZZLES_FILE && value.as_slice() == EXAMPLE_PUZZLES
         )));
+        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert_eq!(runner.app().puzzles.len(), 10);
+        assert!(runner.app().file_error.is_none());
+    }
+
+    #[test]
+    fn invalid_only_collection_is_preserved_and_examples_are_used_in_memory() {
         let (runner, commands) = runner(Some(b"invalid JSON".to_vec()));
         assert!(runner.app().file_error.is_some());
         assert_eq!(runner.app().puzzles.len(), 10);
+        assert!(runner.app().active_collection.is_none());
+        assert_eq!(runner.app().collections.len(), 1);
+        assert!(!runner.app().collections[0].valid);
         assert!(!commands
             .iter()
             .any(|command| matches!(command, Command::Store(StoreRequest::Save { .. }))));
+    }
+
+    #[test]
+    fn picker_uses_title_and_switches_to_a_valid_collection() {
+        let (mut runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+            ("puzzles-endgames.json", ALT_PUZZLES.to_vec()),
+        ]);
+        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        let initial_board = runner.app().board.clone();
+
+        let index = runner
+            .app()
+            .collections
+            .iter()
+            .position(|entry| entry.key == "puzzles-endgames.json")
+            .unwrap();
+        assert_eq!(
+            collection_display_name(&runner.app().collections[index]),
+            "Endgames"
+        );
+
+        runner.action(action_id(PUZZLE_PICKER));
+        assert!(runner.app().picker_open);
+        let commands = runner.action(action_id(&collection_action(index)));
+        assert!(!runner.app().picker_open);
+        assert_eq!(runner.app().board, initial_board);
+        assert!(commands.iter().any(|command| matches!(
+            command,
+            Command::Store(StoreRequest::Load { key }) if key == "puzzles-endgames.json"
+        )));
+
+        runner.store_result(StoreResult::Loaded {
+            key: "puzzles-endgames.json".into(),
+            value: Some(ALT_PUZZLES.to_vec()),
+        });
+
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some("puzzles-endgames.json")
+        );
+        assert_eq!(runner.app().puzzle_index, 0);
+        assert_eq!(runner.app().puzzles.len(), 2);
+        assert_eq!(
+            runner.app().puzzles[0].description.as_deref(),
+            Some("Endgame one.")
+        );
+
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzle_index, 1);
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzle_index, 1);
+    }
+
+    #[test]
+    fn invalid_selected_collection_keeps_current_board_and_reports_its_name() {
+        let broken = b"{ not valid json".to_vec();
+        let (mut runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+            ("puzzles-broken.json", broken.clone()),
+        ]);
+        let before = runner.app().board.clone();
+        let active = runner.app().active_collection.clone();
+        let index = runner
+            .app()
+            .collections
+            .iter()
+            .position(|entry| entry.key == "puzzles-broken.json")
+            .unwrap();
+
+        runner.action(action_id(PUZZLE_PICKER));
+        runner.action(action_id(&collection_action(index)));
+        runner.store_result(StoreResult::Loaded {
+            key: "puzzles-broken.json".into(),
+            value: Some(broken),
+        });
+
+        assert_eq!(runner.app().active_collection, active);
+        assert_eq!(runner.app().board, before);
+        assert!(runner
+            .app()
+            .file_error
+            .as_deref()
+            .is_some_and(|error| error.contains("puzzles-broken.json")));
+        assert!(!runner.app().collections[index].valid);
     }
 
     #[test]
@@ -1117,7 +1644,7 @@ mod tests {
                             "button should be square"
                         );
                     }
-                    for action in [MODE_SOLUTION, MODE_FREE_BOARD] {
+                    for action in [MODE_SOLUTION, MODE_FREE_BOARD, PUZZLE_PICKER] {
                         rect_for(action_id(action));
                     }
                 }
@@ -1154,6 +1681,28 @@ mod tests {
                 "{action} should have a touch target"
             );
         }
+
+        let (mut picker_runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+            ("puzzles-endgames.json", ALT_PUZZLES.to_vec()),
+        ]);
+        picker_runner.action(action_id(PUZZLE_PICKER));
+        let screen = picker_runner.app().screen();
+        let diagnostics =
+            screen.diagnostics(&picker_runner.context().metrics(), &Chrome::measuring(false));
+        assert!(
+            !diagnostics.has_errors(),
+            "collection picker: {:?}",
+            diagnostics.issues
+        );
+        for index in 0..picker_runner.app().collections.len() {
+            assert!(diagnostics.layout.nodes.iter().any(|node| {
+                node.kind.acts_on() == Some(action_id(&collection_action(index)))
+            }));
+        }
+        assert!(diagnostics.layout.nodes.iter().any(|node| {
+            node.kind.acts_on() == Some(action_id(PUZZLE_PICKER_CANCEL))
+        }));
     }
 }
 

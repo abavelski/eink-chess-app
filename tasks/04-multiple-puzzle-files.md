@@ -1,6 +1,6 @@
 # Task 04 — Multiple puzzle files and collection picker
 
-**Status:** Ready  
+**Status:** Implemented  
 **Depends on:** Tasks 01–03  
 **Primary files:** `src/puzzle.rs`, `src/main.rs`, `docs/PUZZLE_FORMAT.md`
 

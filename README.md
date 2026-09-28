@@ -18,8 +18,9 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 ## MVP
 
 - 8×8 board
-- load puzzles with a FEN, optional description, and solution from JSON
-- browse saved puzzles with the Kobo page-turn buttons
+- load multiple puzzle collections with FENs, descriptions, and solutions from JSON
+- switch collections from the on-device **Puzzles** picker
+- browse puzzles in the active collection with the Kobo page-turn buttons
 - face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
 - touch a square to attempt the next solution move
@@ -40,16 +41,20 @@ moves are not graded and do not advance the solution. Returning to Solution
 mode restores the puzzle FEN and restarts the attempt while preserving the
 current board orientation.
 
-Place a UTF-8 `puzzles.json` file at
-`.adds/cobalt/state/eink-chess/puzzles.json` on the mounted reader while the app
-is closed. The [puzzle file format](docs/PUZZLE_FORMAT.md) documents the fields.
-If the file is missing, the app creates the ten CC0 Lichess examples in
-[examples/puzzles.json](examples/puzzles.json). The deployment script also
-installs those examples when no puzzle file exists.
+Place UTF-8 puzzle collections in `.adds/cobalt/state/eink-chess/` on the
+mounted reader while the app is closed. The default collection is
+`puzzles.json`; additional collections use names such as
+`puzzles-endgames.json` or `puzzles-tactics.json`. The on-device **Puzzles**
+button opens a picker and uses each file's optional `title` as its display name.
+The [puzzle file format](docs/PUZZLE_FORMAT.md) documents the exact naming and
+fields. If no puzzle collection exists, the app creates the ten CC0 Lichess
+examples as `puzzles.json`.
 
-Page-turn buttons browse the puzzles. **Reset** restores the current puzzle's
-FEN and restarts its solution; **Flip** changes only the viewing side. Each newly
-selected puzzle automatically faces the color whose turn is recorded in the FEN.
+Page-turn buttons browse puzzles inside the active collection. **Puzzles**
+switches collections, starting the selected collection at its first puzzle.
+**Reset** restores the current puzzle's FEN and restarts its solution; **Flip**
+changes only the viewing side. Each newly selected puzzle automatically faces
+the color whose turn is recorded in the FEN.
 Solver moves are checked against the stored UCI line. Correct moves are accepted,
 wrong moves are restored, stored opponent replies are applied automatically, and
 the final move shows **Solution complete**. The old `positions.fen` file is no
