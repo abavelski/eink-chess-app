@@ -98,3 +98,26 @@ Make practice sessions more efficient by letting the user move through only the 
 - The exact wording and placement of the toggle can be refined with the rest of the toolbar/navigation UI.
 - Whether the filter state itself should persist across app restarts can be decided during implementation.
 
+## 5. Richer solution mode
+
+Expand the current single-line solution concept into a richer solution mode that can represent more than one fixed sequence of UCI moves.
+
+### Goal
+
+Support puzzles where the solution may include explanatory text, alternative continuations, or multiple valid branches instead of assuming one linear move sequence.
+
+### Ideas to explore
+
+- Allow solution steps or branches to include optional descriptions or explanations.
+- Support multiple valid solution branches where more than one move or continuation is acceptable.
+- Allow branch-specific follow-up moves and explanations.
+- Make the solution UI able to communicate why a move is correct, not only whether it matches.
+- Keep the representation suitable for authored learning material, not only imported tactical puzzles.
+- Consider how richer solution data should be displayed progressively so the answer is not revealed too early.
+
+### Notes
+
+- This is likely a larger change involving both the puzzle data format and the solution-checking state machine.
+- Do not lock in the schema yet; the interaction model and file format should be designed together once the basic solution-checking flow is working.
+- Backward compatibility with the current simple `solution: ["e2e4", ...]` format should be considered when this is implemented.
+
