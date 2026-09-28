@@ -171,3 +171,27 @@ Handle one essential chess rule that cannot be represented correctly by simply m
 - The current puzzle format already supports promoted UCI moves such as `a7a8q`, so solution files do not need a schema change for this feature.
 - Underpromotion to rook, bishop, or knight should be supported from the start rather than assuming promotion always means queen.
 
+## 7. Pawn promotion
+
+Implement pawn promotion as a real chess rule instead of treating a pawn move to the last rank as an ordinary piece move.
+
+### Goal
+
+When a pawn reaches the last rank, let the user choose the promoted piece before the move is considered complete.
+
+### Expected behavior
+
+- Detect when a white pawn is moved to rank 8 or a black pawn is moved to rank 1.
+- After the pawn reaches the promotion square, open a simple selection dialog.
+- Offer the standard promotion choices: **Queen**, **Rook**, **Bishop**, and **Knight**.
+- Replace the pawn with the selected piece and then complete the move.
+- In Solution mode, include the selected promotion piece when comparing the move against UCI notation such as `a7a8q`.
+- In Free board mode, use the same promotion dialog so exploratory moves behave naturally.
+- Do not silently default to a queen; require an explicit choice.
+- Keep the dialog clear and touch-friendly for the e-ink screen.
+
+### Notes
+
+- Promotion handling should live close to the board/move model rather than only in rendering code so both solution checking and free-board mode can use the same behavior.
+- The current puzzle format already supports promotion suffixes in UCI moves, so this should not require a puzzle-file format change.
+
