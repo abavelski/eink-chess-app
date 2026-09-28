@@ -353,9 +353,7 @@ fn square_name(square: usize) -> String {
 
 fn square_from_name(name: &str) -> Option<usize> {
     let bytes = name.as_bytes();
-    if bytes.len() != 2
-        || !(b'a'..=b'h').contains(&bytes[0])
-        || !(b'1'..=b'8').contains(&bytes[1])
+    if bytes.len() != 2 || !(b'a'..=b'h').contains(&bytes[0]) || !(b'1'..=b'8').contains(&bytes[1])
     {
         return None;
     }
@@ -373,8 +371,12 @@ fn uci_squares(movement: &str) -> Option<(usize, usize)> {
     if bytes.len() != 4 && bytes.len() != 5 {
         return None;
     }
-    let from = std::str::from_utf8(&bytes[..2]).ok().and_then(square_from_name)?;
-    let to = std::str::from_utf8(&bytes[2..4]).ok().and_then(square_from_name)?;
+    let from = std::str::from_utf8(&bytes[..2])
+        .ok()
+        .and_then(square_from_name)?;
+    let to = std::str::from_utf8(&bytes[2..4])
+        .ok()
+        .and_then(square_from_name)?;
     Some((from, to))
 }
 
@@ -532,10 +534,7 @@ mod tests {
             .piece_at(square_from_name("f7").unwrap())
             .is_none());
         assert_eq!(
-            runner
-                .app()
-                .board
-                .piece_at(square_from_name("f8").unwrap()),
+            runner.app().board.piece_at(square_from_name("f8").unwrap()),
             Some(Piece {
                 color: Color::Black,
                 kind: PieceKind::King,

@@ -293,10 +293,7 @@ mod tests {
         assert_eq!(board.tap(52), TapResult::SelectionChanged); // e2
         assert_eq!(board.selected(), Some(52));
 
-        assert_eq!(
-            board.tap(36),
-            TapResult::Moved { from: 52, to: 36 }
-        ); // e4
+        assert_eq!(board.tap(36), TapResult::Moved { from: 52, to: 36 }); // e4
         assert!(board.piece_at(52).is_none());
         assert_eq!(
             board.piece_at(36),
@@ -337,10 +334,7 @@ mod tests {
         let mut board = Board::default();
 
         assert_eq!(board.tap(56), TapResult::SelectionChanged); // a1 white rook
-        assert_eq!(
-            board.tap(0),
-            TapResult::Moved { from: 56, to: 0 }
-        ); // a8 black rook
+        assert_eq!(board.tap(0), TapResult::Moved { from: 56, to: 0 }); // a8 black rook
 
         assert_eq!(
             board.piece_at(0),
