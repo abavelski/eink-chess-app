@@ -29,8 +29,15 @@ pub struct Piece {
 pub enum TapResult {
     NoChange,
     SelectionChanged,
-    Moved { from: usize, to: usize },
-    Promotion { from: usize, to: usize, color: Color },
+    Moved {
+        from: usize,
+        to: usize,
+    },
+    Promotion {
+        from: usize,
+        to: usize,
+        color: Color,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
