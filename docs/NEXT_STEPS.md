@@ -48,3 +48,29 @@ Make it easy to keep separate puzzle sets on the Kobo and switch between them wi
 - Reuse the existing puzzle JSON format; multiple-file support should not require a new puzzle schema.
 - The file-selection UI should be simple and high-contrast for the e-ink display, with large touch targets.
 - The exact storage naming rules and whether the last selected file should be remembered across launches can be decided during implementation.
+
+## 3. Persist progress for each puzzle file
+
+Keep learning progress with each puzzle file so that switching collections or restarting the app does not lose the user's place.
+
+### Goal
+
+Remember which puzzles have already been solved correctly and which puzzle the user was viewing in each puzzle file.
+
+### Expected behavior
+
+- Track whether each puzzle has been solved correctly.
+- When browsing puzzles, clearly indicate puzzles that have already been solved.
+- Persist this solved state so it survives app restarts.
+- Persist the current puzzle for each puzzle file.
+- When switching away from a puzzle file and later selecting it again, restore the puzzle that was active in that file rather than starting from the beginning.
+- Progress in one puzzle file must not affect another puzzle file.
+- A puzzle should only be marked solved after its complete solution has been entered correctly.
+
+### Notes
+
+- The persisted state should be associated with the puzzle file itself, including both per-puzzle solved status and the file's current puzzle.
+- Prefer stable puzzle IDs for saved progress rather than relying only on array positions, so reordering puzzles does not move solved status to the wrong puzzle.
+- The exact representation can be decided during implementation; if progress is written directly into the puzzle JSON, the puzzle format/versioning and compatibility with externally supplied files will need to be updated deliberately.
+- Solved-state indicators should remain clear on a monochrome e-ink display and should not depend on color.
+
