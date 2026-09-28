@@ -130,11 +130,7 @@ impl ChessBoardApp {
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
             .board_with_selection(SIDE as u8, cells)
             .chips([
-                (
-                    MODE_SOLUTION,
-                    "Solution",
-                    self.mode == BoardMode::Solution,
-                ),
+                (MODE_SOLUTION, "Solution", self.mode == BoardMode::Solution),
                 (
                     MODE_FREE_BOARD,
                     "Free board",
@@ -167,13 +163,13 @@ impl ChessBoardApp {
         if self.mode == BoardMode::Solution {
             if let Some(feedback) = self.solution_feedback {
                 screen = match feedback {
-                SolutionFeedback::Correct => screen.banner(BannerLevel::Info, "Correct"),
-                SolutionFeedback::Wrong => {
-                    screen.banner(BannerLevel::Attention, "Wrong move — try again")
-                }
-                SolutionFeedback::Complete => {
-                    screen.banner(BannerLevel::Attention, "Solution complete")
-                }
+                    SolutionFeedback::Correct => screen.banner(BannerLevel::Info, "Correct"),
+                    SolutionFeedback::Wrong => {
+                        screen.banner(BannerLevel::Attention, "Wrong move — try again")
+                    }
+                    SolutionFeedback::Complete => {
+                        screen.banner(BannerLevel::Attention, "Solution complete")
+                    }
                 };
             }
         }
@@ -1084,36 +1080,36 @@ mod tests {
                 for feedback in feedback_states {
                     layout_runner.app_mut().solution_feedback = feedback;
                     let screen = layout_runner.app().screen();
-                let diagnostics = screen.diagnostics(
-                    &layout_runner.context().metrics(),
-                    &Chrome::measuring(false),
-                );
+                    let diagnostics = screen.diagnostics(
+                        &layout_runner.context().metrics(),
+                        &Chrome::measuring(false),
+                    );
                     assert!(
                         !diagnostics.has_errors(),
                         "puzzle {index}, mode {mode:?}, feedback {feedback:?}: {:?}",
                         diagnostics.issues
                     );
-                let rect_for = |action| {
-                    diagnostics
+                    let rect_for = |action| {
+                        diagnostics
+                            .layout
+                            .nodes
+                            .iter()
+                            .find(|node| node.kind.acts_on() == Some(action))
+                            .expect("action has a touch target")
+                            .rect
+                    };
+                    let board_frame = diagnostics
                         .layout
                         .nodes
                         .iter()
-                        .find(|node| node.kind.acts_on() == Some(action))
-                        .expect("action has a touch target")
-                        .rect
-                };
-                let board_frame = diagnostics
-                    .layout
-                    .nodes
-                    .iter()
-                    .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
-                    .expect("board has an outer frame")
-                    .rect;
-                let flip = rect_for(action_id(FLIP));
-                assert!(
-                    (flip.x + flip.width - board_frame.x - board_frame.width).abs() <= 1,
-                    "toolbar should align with the outer board border"
-                );
+                        .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+                        .expect("board has an outer frame")
+                        .rect;
+                    let flip = rect_for(action_id(FLIP));
+                    assert!(
+                        (flip.x + flip.width - board_frame.x - board_frame.width).abs() <= 1,
+                        "toolbar should align with the outer board border"
+                    );
                     for action in [RESET, FLIP] {
                         let button = rect_for(action_id(action));
                         assert!(
