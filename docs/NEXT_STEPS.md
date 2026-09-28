@@ -121,3 +121,28 @@ Support puzzles where the solution may include explanatory text, alternative con
 - Do not lock in the schema yet; the interaction model and file format should be designed together once the basic solution-checking flow is working.
 - Backward compatibility with the current simple `solution: ["e2e4", ...]` format should be considered when this is implemented.
 
+## 6. Solution mode and free-board mode
+
+Add an explicit mode switch between normal puzzle solving and a temporary free-board workspace.
+
+### Goal
+
+Let the user explore a position freely, like using a physical chessboard, without affecting puzzle progress or the expected solution sequence.
+
+### Expected behavior
+
+- Add a visible toggle button for switching between **Solution mode** and **Free board**.
+- In **Solution mode**, moves are checked against the puzzle solution and normal puzzle progress/feedback applies.
+- In **Free board** mode, the user can move pieces around freely without moves being graded or solution progress being changed.
+- Board rotation and the other normal board controls should remain available in Free board mode.
+- The user can make as many exploratory moves as desired while in Free board mode.
+- When switching from Free board back to Solution mode, reset the puzzle to its original starting position.
+- After the reset, solution checking should resume from the beginning of the puzzle as normal.
+- Free-board exploration must not mark a puzzle solved or modify its persisted solved state.
+
+### Notes
+
+- Free board should feel like a scratch board attached to the current puzzle rather than a separate chess game.
+- The active mode should be very obvious on the e-ink display so the user knows whether moves are currently being graded.
+- Whether board orientation should reset when returning to Solution mode can be decided during implementation; the puzzle position itself should definitely reset.
+
