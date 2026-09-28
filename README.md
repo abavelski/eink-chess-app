@@ -21,6 +21,8 @@ The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/Ban
 - load multiple puzzle collections with FENs, descriptions, and solutions from JSON
 - switch collections from the on-device **Puzzles** picker
 - browse puzzles in the active collection with the Kobo page-turn buttons
+- remember the active collection, each collection's current puzzle, and solved puzzles
+- show an explicit **Solved** marker when revisiting completed puzzles
 - face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
 - touch a square to attempt the next solution move
@@ -51,14 +53,16 @@ fields. If no puzzle collection exists, the app creates the ten CC0 Lichess
 examples as `puzzles.json`.
 
 Page-turn buttons browse puzzles inside the active collection. **Puzzles**
-switches collections, starting the selected collection at its first puzzle.
-**Reset** restores the current puzzle's FEN and restarts its solution; **Flip**
-changes only the viewing side. Each newly selected puzzle automatically faces
+switches collections and restores the last puzzle visited in each collection.
+The active collection and per-file positions are restored after restarting the
+app. **Reset** restores the current puzzle's FEN and restarts its solution;
+**Flip** changes only the viewing side. Each newly selected puzzle automatically faces
 the color whose turn is recorded in the FEN.
 Solver moves are checked against the stored UCI line. Correct moves are accepted,
 wrong moves are restored, stored opponent replies are applied automatically, and
-the final move shows **Solution complete**. The old `positions.fen` file is no
-longer read.
+the final move shows **Solution complete**. Completed puzzle IDs are stored
+separately in `progress.v1`; uploaded puzzle JSON files are never modified.
+The old `positions.fen` file is no longer read.
 
 ## Architecture
 

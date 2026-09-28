@@ -113,6 +113,27 @@ untouched so they can be fixed over USB.
 
 Existing `positions.fen` files are left in place but are no longer loaded.
 
+## Progress
+
+Learning progress is kept separately from uploaded puzzle collections in the
+Cobalt store record `progress.v1`. Puzzle JSON files are never modified to
+record progress.
+
+The progress record remembers the active collection, the current puzzle ID for
+each collection, and the set of solved puzzle IDs. Durable references use
+puzzle IDs rather than array positions, so reordering a collection does not move
+progress to the wrong puzzle. Returning to a collection restores its remembered
+puzzle when that ID still exists; otherwise the first puzzle is used. On app
+startup the remembered active collection is preferred when it still exists,
+with `puzzles.json` and then the first valid sorted collection as fallbacks.
+
+A puzzle becomes **Solved** only when its complete solution line is accepted.
+Reset and Free board do not clear or add solved state. Save failures leave the
+newest progress in memory and display **Progress not saved**; the app retries on
+the next progress change or lifecycle save opportunity. A malformed or future
+`progress.v1` is not overwritten automatically: the app warns and continues
+without durable progress until that record is deliberately fixed or cleared.
+
 ## Lichess imports
 
 The [Lichess puzzle database](https://database.lichess.org/#puzzles) is CC0.

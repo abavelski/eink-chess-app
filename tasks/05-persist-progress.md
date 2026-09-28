@@ -1,6 +1,6 @@
 # Task 05 — Persist solved progress and per-file position
 
-**Status:** Ready  
+**Status:** Implemented  
 **Depends on:** Tasks 01 and 04  
 **Primary files:** new progress/state module, `src/main.rs`, tests
 
