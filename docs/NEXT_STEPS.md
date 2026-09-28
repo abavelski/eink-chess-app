@@ -24,3 +24,27 @@ Turn a displayed puzzle into an interactive exercise: after the user moves a pie
 - The existing puzzle format already stores solutions as UCI moves, so this should not require a puzzle-file format change.
 - The first implementation should focus on solution checking and feedback. How opponent replies in multi-move solutions are handled (for example, user-played versus automatically applied) can be decided separately.
 - Feedback should be easy to notice on an e-ink screen and should not rely on color alone.
+
+## 2. Support multiple puzzle files
+
+Allow several puzzle JSON files to be uploaded to the device instead of relying on a single `puzzles.json` collection.
+
+### Goal
+
+Make it easy to keep separate puzzle sets on the Kobo and switch between them without reconnecting the device or replacing the current file.
+
+### Expected behavior
+
+- Discover the available puzzle files stored for the app.
+- Add a visible button to the main UI for choosing the active puzzle file.
+- Pressing the button opens a simple selection dialog listing the available uploaded puzzle files.
+- Selecting a file loads that puzzle collection and closes the dialog.
+- After switching files, show the puzzles from the newly selected collection and start from an appropriate initial puzzle in that collection.
+- Keep the existing puzzle browsing controls working within the currently selected file.
+- Handle an invalid or unreadable selected file with a clear error instead of crashing or silently switching to another collection.
+
+### Notes
+
+- Reuse the existing puzzle JSON format; multiple-file support should not require a new puzzle schema.
+- The file-selection UI should be simple and high-contrast for the e-ink display, with large touch targets.
+- The exact storage naming rules and whether the last selected file should be remembered across launches can be decided during implementation.
