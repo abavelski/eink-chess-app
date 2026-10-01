@@ -17,6 +17,8 @@ const RESET: &str = "reset";
 const FLIP: &str = "flip";
 const EXIT: &str = "exit";
 const MODE_TOGGLE: &str = "mode-toggle";
+const ORIENTATION_LOCK: &str = "orientation-lock";
+const DESCRIPTION_TOGGLE: &str = "description-toggle";
 const PUZZLE_PICKER: &str = "puzzle-picker";
 const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
 const COLLECTION_ACTION_PREFIX: &str = "collection-";
@@ -103,6 +105,8 @@ struct ChessBoardApp {
     file_error: Option<String>,
     sleeping: bool,
     flipped: bool,
+    orientation_locked: bool,
+    description_visible: bool,
 }
 
 impl ChessBoardApp {
@@ -239,12 +243,15 @@ impl ChessBoardApp {
     fn select_puzzle(&mut self, index: usize) {
         let puzzle = &self.puzzles[index];
         self.board = Board::from_fen(&puzzle.fen).expect("validated puzzle FEN");
-        self.flipped = puzzle.side_to_move() == Color::Black;
+        if !self.orientation_locked {
+            self.flipped = puzzle.side_to_move() == Color::Black;
+        }
         self.puzzle_index = index;
         self.reset_attempt();
     }
 
     fn reset_attempt(&mut self) {
+        self.description_visible = false;
         self.solution_ply = 0;
         self.solution_feedback = None;
         self.pending_promotion = None;
@@ -431,14 +438,24 @@ impl ChessBoardApp {
             "Sleeping - press power to wake".to_owned()
         } else if self.file_error.is_some() {
             "Puzzle file needs fixing".to_owned()
-        } else {
+        } else if let Some(puzzle) = self.puzzles.get(self.puzzle_index) {
+            let difficulty = puzzle
+                .difficulty
+                .as_ref()
+                .map(|value| format!(" ({value})"))
+                .unwrap_or_default();
             format!(
-                "E-Ink Chess {}/{}",
+                "{}/{} {}{difficulty}",
                 self.puzzle_index + 1,
-                self.puzzles.len()
+                self.puzzles.len(),
+                puzzle.id
             )
+        } else {
+            "0/0".to_owned()
         };
         let free_board = self.mode == BoardMode::FreeBoard;
+        let orientation_locked = self.orientation_locked;
+        let description_visible = self.description_visible;
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
@@ -453,13 +470,25 @@ impl ChessBoardApp {
                             as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
-                        // Three 10 mm targets with two 1 mm gaps.
-                        SlotWidth::Fixed(320),
+                        // Five 10 mm targets with four 1 mm gaps.
+                        SlotWidth::Fixed(540),
                         Box::new(move |slot| {
                             slot.controls_with_selection(
-                                3,
+                                5,
                                 [
                                     (MODE_TOGGLE, "Toggle free board", Glyph::Grid, free_board),
+                                    (
+                                        DESCRIPTION_TOGGLE,
+                                        "Toggle solution description",
+                                        Glyph::Note,
+                                        description_visible,
+                                    ),
+                                    (
+                                        ORIENTATION_LOCK,
+                                        "Toggle orientation lock",
+                                        Glyph::Key,
+                                        orientation_locked,
+                                    ),
                                     (RESET, "Reset position", Glyph::Refresh, false),
                                     (FLIP, "Flip board", Glyph::SwapVertical, false),
                                 ],
@@ -487,9 +516,7 @@ impl ChessBoardApp {
                 status.to_owned()
             };
             screen = screen.secondary(status);
-            if self.mode == BoardMode::Solution
-                && self.solution_feedback == Some(SolutionFeedback::Complete)
-            {
+            if self.description_visible {
                 if let Some(description) = puzzle
                     .description
                     .as_deref()
@@ -609,6 +636,7 @@ impl ChessBoardApp {
         }
 
         self.pending_promotion = None;
+        self.description_visible = false;
         self.board.clear_selection();
         match mode {
             BoardMode::FreeBoard => {
@@ -676,6 +704,7 @@ impl ChessBoardApp {
             SolutionFeedback::Correct
         });
         if complete {
+            self.description_visible = true;
             self.mark_current_solved();
         }
     }
@@ -888,6 +917,18 @@ impl KoboApp for ChessBoardApp {
                 BoardMode::Solution => BoardMode::FreeBoard,
                 BoardMode::FreeBoard => BoardMode::Solution,
             });
+            self.show(context);
+            return;
+        }
+
+        if action == action_id(DESCRIPTION_TOGGLE) {
+            self.description_visible = !self.description_visible;
+            self.show(context);
+            return;
+        }
+
+        if action == action_id(ORIENTATION_LOCK) {
+            self.orientation_locked = !self.orientation_locked;
             self.show(context);
             return;
         }
@@ -1474,11 +1515,68 @@ mod tests {
     }
 
     #[test]
+    fn description_toggle_works_before_and_after_solving_and_in_free_board() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        let description = runner.app().puzzles[0].description.clone().unwrap();
+        let has_description = |app: &ChessBoardApp| {
+            app.screen().nodes.iter().any(
+                |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+            )
+        };
+        let initial_board = runner.app().board.clone();
+        runner.action(action_id(DESCRIPTION_TOGGLE));
+        assert!(has_description(runner.app()));
+        assert_eq!(runner.app().board, initial_board);
+        assert_eq!(runner.app().solution_ply, 0);
+        assert!(!runner.app().current_is_solved());
+        let diagnostics = runner
+            .app()
+            .screen()
+            .diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
+        assert!(diagnostics.layout.nodes.iter().any(|node| {
+            matches!(node.kind, kobo_sdk::LayoutKind::Cell(action, _, true)
+                if action == action_id(DESCRIPTION_TOGGLE))
+        }));
+        runner.action(action_id(DESCRIPTION_TOGGLE));
+        assert!(!has_description(runner.app()));
+
+        play(&mut runner, "d7e8");
+        assert!(
+            has_description(runner.app()),
+            "solving still reveals the description"
+        );
+        runner.action(action_id(DESCRIPTION_TOGGLE));
+        assert!(
+            !has_description(runner.app()),
+            "a solved description can be hidden"
+        );
+        assert!(runner.app().current_is_solved());
+        runner.action(action_id(DESCRIPTION_TOGGLE));
+        assert!(has_description(runner.app()));
+        runner.action(action_id(RESET));
+        assert!(!has_description(runner.app()));
+        runner.action(action_id(MODE_TOGGLE));
+        runner.action(action_id(DESCRIPTION_TOGGLE));
+        assert!(
+            has_description(runner.app()),
+            "manual reveal also works in Free board"
+        );
+        runner.page_turn(true);
+        assert!(
+            !runner.app().description_visible,
+            "navigation hides the next solution"
+        );
+    }
+
+    #[test]
     fn completed_puzzles_allow_missing_or_blank_descriptions() {
         for description in [None, Some(String::new()), Some(" \n ".into())] {
             let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
             runner.app_mut().puzzles[0].description = description;
             play(&mut runner, "d7e8");
+            runner.action(action_id(DESCRIPTION_TOGGLE));
+            runner.action(action_id(DESCRIPTION_TOGGLE));
             assert!(!runner
                 .app()
                 .screen()
@@ -1762,6 +1860,62 @@ mod tests {
                 color: Color::White,
                 kind: PieceKind::Rook,
             })
+        );
+    }
+
+    #[test]
+    fn orientation_lock_keeps_manual_orientation_across_puzzles_and_collections() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        assert!(!runner.app().flipped);
+        runner.action(action_id(ORIENTATION_LOCK));
+        assert!(runner.app().orientation_locked);
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzles[1].side_to_move(), Color::Black);
+        assert!(!runner.app().flipped, "lock keeps White at the bottom");
+
+        let screen = runner.app().screen();
+        let diagnostics =
+            screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
+        assert!(diagnostics.layout.nodes.iter().any(|node| {
+            matches!(node.kind, kobo_sdk::LayoutKind::Cell(action, _, true)
+                if action == action_id(ORIENTATION_LOCK))
+        }));
+
+        runner.action(action_id(FLIP));
+        assert!(runner.app().flipped, "manual flip works while locked");
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzles[2].side_to_move(), Color::White);
+        assert!(
+            runner.app().flipped,
+            "lock keeps the manually flipped orientation"
+        );
+        runner.action(action_id(RESET));
+        runner.action(action_id(MODE_TOGGLE));
+        runner.action(action_id(MODE_TOGGLE));
+        assert!(runner.app().orientation_locked);
+        assert!(runner.app().flipped);
+
+        runner.app_mut().activate_collection(
+            Some("puzzles-endgames.json".into()),
+            parse_puzzle_file(ALT_PUZZLES).unwrap(),
+        );
+        assert!(runner.app().orientation_locked);
+        assert!(
+            runner.app().flipped,
+            "collection changes also keep orientation"
+        );
+        runner.action(action_id(ORIENTATION_LOCK));
+        assert!(!runner.app().orientation_locked);
+        assert!(
+            runner.app().flipped,
+            "unlocking does not jump the current board"
+        );
+        runner.page_turn(true);
+        runner.page_turn(false);
+        assert!(
+            !runner.app().flipped,
+            "automatic orientation resumes on navigation"
         );
     }
 
@@ -2158,6 +2312,8 @@ mod tests {
                 layout_runner.app_mut().mode = mode;
                 for feedback in feedback_states {
                     layout_runner.app_mut().solution_feedback = feedback;
+                    layout_runner.app_mut().description_visible =
+                        feedback == Some(SolutionFeedback::Complete);
                     let screen = layout_runner.app().screen();
                     let diagnostics = screen.diagnostics(
                         &layout_runner.context().metrics(),
@@ -2242,7 +2398,13 @@ mod tests {
                         kobo_sdk::LayoutKind::Cell(_, _, selected)
                             if selected == (mode == BoardMode::FreeBoard)
                     ));
-                    for action in [MODE_TOGGLE, RESET, FLIP] {
+                    for action in [
+                        MODE_TOGGLE,
+                        DESCRIPTION_TOGGLE,
+                        ORIENTATION_LOCK,
+                        RESET,
+                        FLIP,
+                    ] {
                         let button = rect_for(action_id(action));
                         assert!(
                             (button.width - button.height).abs() <= 1,

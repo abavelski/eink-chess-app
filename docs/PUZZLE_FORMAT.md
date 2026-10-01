@@ -44,7 +44,8 @@ current app.
 | --- | --- | --- |
 | `id` | Yes | A nonempty string, unique within the file. |
 | `fen` | Yes | The complete six-field FEN at the moment the solver should move. |
-| `description` | No | An explanation displayed below the board and toolbar after the full solution is accepted. Use `\n` for line breaks. May be omitted, empty, or `null`. |
+| `description` | No | An explanation displayed below the board and toolbar after solving or when the description toggle is active. Use `\n` for line breaks. May be omitted, empty, or `null`. |
+| `difficulty` | No | A string or number shown in parentheses after the puzzle ID in the header, for example `"Hard"` or `4`. May be omitted or `null`. |
 | `solution` | Yes | A nonempty array of UCI moves, beginning with the solver's move and including alternating opponent replies. |
 | `source` | No | Optional provenance URL, ignored by the current app. |
 
@@ -57,6 +58,13 @@ and is placed at the bottom of the board whenever a puzzle is selected.
 The **Flip** control still works. **Reset** restores the current FEN's pieces
 and preserves a manual flip. Selecting another puzzle restores its initial
 position and chooses its orientation from its FEN.
+
+The **orientation lock** key icon below the board keeps the current orientation
+when browsing puzzles or switching collections. Its gray fill indicates that
+the lock is active. **Flip** still works while locked; the new orientation is
+then kept for subsequent puzzles. Turning the lock off keeps the current board
+as it is and resumes automatic orientation when another puzzle is selected.
+The lock starts off when the app is reopened.
 
 ## Solutions
 
@@ -78,8 +86,11 @@ solution. A correct intermediate move adds **Correct** to the turn line.
 Finishing the sequence shows a centered thumbs up over the board; an incorrect
 move shows a thumbs down. Completing the solution also reveals its optional
 description below the board and toolbar. Reset, changing puzzles, or entering
-Free board hides the description until the solution is completed again.
-Reset removes the result icon.
+Free board hides the description. The note icon below the board toggles the
+description on or off at any time, including before solving and in Free board.
+Its gray fill indicates that visibility is on. Revealing the description does
+not advance the solution or mark the puzzle as solved. Reset removes the result
+icon.
 
 This is solution matching, not general chess-rule enforcement: the app still
 does not decide whether an ordinary move is legal, whether a king is in check,

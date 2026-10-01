@@ -7,6 +7,22 @@ use std::collections::HashSet;
 pub const MAX_PUZZLE_FILE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Difficulty {
+    Text(String),
+    Number(serde_json::Number),
+}
+
+impl std::fmt::Display for Difficulty {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(text) => formatter.write_str(text),
+            Self::Number(number) => write!(formatter, "{number}"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct PuzzleCollection {
     version: u32,
     #[serde(default)]
@@ -20,6 +36,8 @@ pub struct Puzzle {
     pub fen: String,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
+    pub difficulty: Option<Difficulty>,
     /// Alternating player and opponent moves, starting with the player's move.
     pub solution: Vec<String>,
 }
@@ -110,15 +128,25 @@ mod tests {
         let collection = parse(sample()).unwrap();
         assert!(collection.title.is_none());
         assert!(collection.puzzles[0].description.is_none());
+        assert!(collection.puzzles[0].difficulty.is_none());
         assert_eq!(collection.puzzles[0].side_to_move(), Color::White);
 
         let mut value = sample();
         value["title"] = json!("  Endgames  ");
         value["puzzles"][0]["fen"] = json!("8/8/8/8/8/5kq1/8/7K b - - 0 1");
         value["puzzles"][0]["description"] = json!("Find a mate in one.");
+        value["puzzles"][0]["difficulty"] = json!(4);
         value["puzzles"][0]["solution"] = json!(["g3g2"]);
         let collection = parse(value).unwrap();
         assert_eq!(collection.title.as_deref(), Some("Endgames"));
+        assert_eq!(
+            collection.puzzles[0]
+                .difficulty
+                .as_ref()
+                .unwrap()
+                .to_string(),
+            "4"
+        );
         assert_eq!(collection.puzzles[0].side_to_move(), Color::Black);
         assert_eq!(
             collection.puzzles[0].description.as_deref(),
@@ -128,6 +156,30 @@ mod tests {
         let mut value = sample();
         value["title"] = json!("   ");
         assert!(parse(value).unwrap().title.is_none());
+    }
+
+    #[test]
+    fn difficulty_accepts_text_or_numbers_and_displays_without_quotes() {
+        for (difficulty, expected) in [
+            (json!("Hard"), Some("Hard")),
+            (json!("3 stars"), Some("3 stars")),
+            (json!(4), Some("4")),
+            (json!(2.5), Some("2.5")),
+            (json!(-1), Some("-1")),
+            (json!(null), None),
+        ] {
+            let mut value = sample();
+            value["puzzles"][0]["difficulty"] = difficulty;
+            let collection = parse(value).unwrap();
+            assert_eq!(
+                collection.puzzles[0]
+                    .difficulty
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .as_deref(),
+                expected
+            );
+        }
     }
 
     #[test]
