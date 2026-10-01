@@ -26,7 +26,7 @@ JSON without comments or trailing commas.
     {
       "id": "lichess-001cr",
       "fen": "8/3B2pp/p5k1/6P1/1ppp1K2/8/1P6/8 w - - 0 39",
-      "description": "Find mate in one.",
+      "description": "Solution begins with d7e8.\nFollow the line one move at a time.\nReplay it to practice the idea.",
       "solution": ["d7e8"],
       "source": "https://lichess.org/training/001cr"
     }
@@ -44,7 +44,7 @@ current app.
 | --- | --- | --- |
 | `id` | Yes | A nonempty string, unique within the file. |
 | `fen` | Yes | The complete six-field FEN at the moment the solver should move. |
-| `description` | No | A short instruction displayed below the board and toolbar. May be omitted, empty, or `null`. |
+| `description` | No | An explanation displayed below the board and toolbar after the full solution is accepted. Use `\n` for line breaks. May be omitted, empty, or `null`. |
 | `solution` | Yes | A nonempty array of UCI moves, beginning with the solver's move and including alternating opponent replies. |
 | `source` | No | Optional provenance URL, ignored by the current app. |
 
@@ -69,14 +69,17 @@ the opponent's reply, and the solver's second move. The file represents one
 main solution line; branching alternatives can be introduced in a later
 format version.
 
-The app validates FENs and move notation, displays the description and turn,
+The app validates FENs and move notation, displays the turn,
 and uses the solution as an exact move sequence. The user enters only the solver
 plies (indexes 0, 2, 4, ...). A correct solver move is kept, the following stored
 opponent ply is applied automatically, and the app then waits for the next
 solver move. A wrong move is restored immediately and does not advance the
 solution. A correct intermediate move adds **Correct** to the turn line.
 Finishing the sequence shows a centered thumbs up over the board; an incorrect
-move shows a thumbs down. Reset removes the result icon.
+move shows a thumbs down. Completing the solution also reveals its optional
+description below the board and toolbar. Reset, changing puzzles, or entering
+Free board hides the description until the solution is completed again.
+Reset removes the result icon.
 
 This is solution matching, not general chess-rule enforcement: the app still
 does not decide whether an ordinary move is legal, whether a king is in check,

@@ -5,25 +5,25 @@
     {
       "id": "promotion-white-queen",
       "fen": "7k/P7/8/8/8/8/8/K7 w - - 0 1",
-      "description": "Promote the a-pawn to a queen.",
+      "description": "Solution begins with a7a8q.\nFollow the line one move at a time.\nReplay it to practice the idea.",
       "solution": ["a7a8q"]
     },
     {
       "id": "promotion-white-knight",
       "fen": "7k/1P6/8/8/8/8/8/K7 w - - 0 1",
-      "description": "Underpromote the b-pawn to a knight.",
+      "description": "Solution begins with b7b8n.\nFollow the line one move at a time.\nReplay it to practice the idea.",
       "solution": ["b7b8n"]
     },
     {
       "id": "promotion-black-rook",
       "fen": "k7/8/8/8/8/8/7p/K7 b - - 0 1",
-      "description": "Underpromote the h-pawn to a rook.",
+      "description": "Solution begins with h2h1r.\nFollow the line one move at a time.\nReplay it to practice the idea.",
       "solution": ["h2h1r"]
     },
     {
       "id": "promotion-auto-reply",
       "fen": "7k/8/8/8/8/8/p6R/7K w - - 0 1",
-      "description": "Move the rook; Black's reply promotes automatically.",
+      "description": "Solution begins with h2h3.\nFollow the line one move at a time.\nReplay it to practice the idea.",
       "solution": ["h2h3", "a2a1q", "h3h8"]
     }
   ]

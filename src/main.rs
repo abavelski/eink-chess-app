@@ -475,7 +475,7 @@ impl ChessBoardApp {
                     Color::White => "White to move",
                     Color::Black => "Black to move",
                 },
-                BoardMode::FreeBoard => "Free board — moves are not graded",
+                BoardMode::FreeBoard => "Free board",
             };
             let status = if self.mode == BoardMode::Solution
                 && self.solution_feedback == Some(SolutionFeedback::Correct)
@@ -487,12 +487,16 @@ impl ChessBoardApp {
                 status.to_owned()
             };
             screen = screen.secondary(status);
-            if let Some(description) = puzzle
-                .description
-                .as_deref()
-                .filter(|text| !text.trim().is_empty())
+            if self.mode == BoardMode::Solution
+                && self.solution_feedback == Some(SolutionFeedback::Complete)
             {
-                screen = screen.text(description);
+                if let Some(description) = puzzle
+                    .description
+                    .as_deref()
+                    .filter(|text| !text.trim().is_empty())
+                {
+                    screen = screen.text(description);
+                }
             }
         }
         if let Some(error) = self.file_error.as_ref() {
@@ -1409,6 +1413,79 @@ mod tests {
             runner.app().solution_feedback,
             Some(SolutionFeedback::Wrong)
         );
+    }
+
+    #[test]
+    fn description_is_revealed_below_controls_only_after_completing_solution() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        runner.app_mut().select_puzzle(2);
+        let description = runner.app().puzzles[2].description.clone().unwrap();
+        let has_description = |app: &ChessBoardApp| {
+            app.screen().nodes.iter().any(
+                |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+            )
+        };
+        assert!(!has_description(runner.app()));
+        play(&mut runner, "e2e5");
+        assert!(!has_description(runner.app()));
+        play(&mut runner, "e2e6");
+        assert!(!has_description(runner.app()));
+        play(&mut runner, "e6f7");
+        assert!(has_description(runner.app()));
+
+        let screen = runner.app().screen();
+        let diagnostics =
+            screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
+        let text = diagnostics
+            .layout
+            .nodes
+            .iter()
+            .find(|node| {
+                node.kind == kobo_sdk::LayoutKind::Text
+                    && node.text_lines.first()
+                        == description.lines().next().map(str::to_owned).as_ref()
+            })
+            .expect("description is laid out");
+        assert_eq!(text.text_lines.len(), 3);
+        for action in [MODE_TOGGLE, RESET, FLIP] {
+            let control = diagnostics
+                .layout
+                .nodes
+                .iter()
+                .find(|node| node.kind.acts_on() == Some(action_id(action)))
+                .expect("toolbar control");
+            assert!(text.rect.y >= control.rect.y + control.rect.height);
+        }
+
+        runner.action(action_id(MODE_TOGGLE));
+        assert!(!has_description(runner.app()));
+        runner.action(action_id(MODE_TOGGLE));
+        play(&mut runner, "e2e6");
+        play(&mut runner, "e6f7");
+        assert!(has_description(runner.app()));
+        runner.action(action_id(RESET));
+        assert!(runner.app().current_is_solved());
+        assert!(!has_description(runner.app()));
+        play(&mut runner, "e2e6");
+        play(&mut runner, "e6f7");
+        runner.page_turn(true);
+        assert!(!has_description(runner.app()));
+    }
+
+    #[test]
+    fn completed_puzzles_allow_missing_or_blank_descriptions() {
+        for description in [None, Some(String::new()), Some(" \n ".into())] {
+            let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+            runner.app_mut().puzzles[0].description = description;
+            play(&mut runner, "d7e8");
+            assert!(!runner
+                .app()
+                .screen()
+                .nodes
+                .iter()
+                .any(|node| { matches!(node, kobo_sdk::Node::Text { .. }) }));
+        }
     }
 
     #[test]
