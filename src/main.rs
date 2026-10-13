@@ -1,8 +1,10 @@
 mod board;
+mod large_collection;
 mod progress;
 mod puzzle;
 
 use board::{Board, Color, Piece, PieceKind, TapResult};
+use large_collection::{CollectionReader, ReadMode, ReadProgress};
 use kobo_sdk::{
     action_id, ActionId, BandAlign, BannerLevel, Context, Glyph, KoboApp, Screen, ScreenBuilder,
     SlotWidth, StoreResult,
@@ -92,6 +94,7 @@ struct ChessBoardApp {
     collections: Vec<CollectionEntry>,
     active_collection: Option<String>,
     collection_load: Option<CollectionLoad>,
+    collection_reader: Option<CollectionReader>,
     metadata_queue: VecDeque<String>,
     picker_open: bool,
     creating_default: bool,
@@ -150,6 +153,7 @@ impl ChessBoardApp {
             .collect();
         self.metadata_queue = keys.into();
         self.collection_load = None;
+        self.collection_reader = None;
 
         if self.collections.is_empty() {
             self.creating_default = true;
@@ -220,6 +224,87 @@ impl ChessBoardApp {
         });
         context.store().load(key);
         self.show(context);
+    }
+
+    // Publish only a fully parsed collection, leaving active board/progress unchanged on errors.
+    fn finish_collection_load(
+        &mut self,
+        context: &mut Context,
+        key: &str,
+        parsed: Result<PuzzleCollection, String>,
+    ) {
+        let Some(load) = self.collection_load.take() else { return };
+        if load.key != key {
+            self.file_error = Some(format!("{key}: unexpected collection response."));
+            self.show(context);
+            return;
+        }
+        match load.kind {
+            CollectionLoadKind::Metadata => {
+                self.update_collection_metadata(key, &parsed);
+                self.load_next_metadata(context);
+            }
+            CollectionLoadKind::Initial => match parsed {
+                Ok(collection) => {
+                    let title = collection.title.clone();
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
+                        entry.title = title;
+                        entry.valid = true;
+                        entry.error = None;
+                    }
+                    self.activate_collection(Some(key.to_owned()), collection);
+                    self.show(context);
+                }
+                Err(error) => {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
+                        entry.valid = false;
+                        entry.error = Some(error.clone());
+                    }
+                    // Try another valid neighbor rather than losing the entire library.
+                    self.load_initial_collection(context);
+                }
+            },
+            CollectionLoadKind::Selection => match parsed {
+                Ok(collection) => {
+                    let title = collection.title.clone();
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
+                        entry.title = title;
+                        entry.valid = true;
+                        entry.error = None;
+                    }
+                    self.activate_collection(Some(key.to_owned()), collection);
+                    self.remember_active_collection();
+                    self.save_progress(context);
+                    self.show(context);
+                }
+                Err(error) => {
+                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
+                    {
+                        entry.valid = false;
+                        entry.error = Some(error.clone());
+                    }
+                    self.file_error = Some(error);
+                    self.show(context);
+                }
+            },
+        }
+    }
+
+    fn finish_metadata_probe(&mut self, context: &mut Context, key: &str) {
+        if !self.collection_load.as_ref().is_some_and(|load|
+            load.key == key && load.kind == CollectionLoadKind::Metadata
+        ) { return; }
+        self.collection_load = None;
+        if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
+            // A first chunk proves accessibility and a bounded size, but is not
+            // full JSON validation. Selection fully validates before activation.
+            entry.valid = true;
+            entry.error = None;
+        }
+        self.load_next_metadata(context);
     }
 
     fn update_collection_metadata(&mut self, key: &str, parsed: &Result<PuzzleCollection, String>) {
@@ -791,82 +876,54 @@ impl KoboApp for ChessBoardApp {
             self.handle_progress_load(result);
             return;
         }
-
-        let Some(load) = self.collection_load.take() else {
-            return;
-        };
+        let Some(load) = self.collection_load.as_ref() else { return };
         if load.key != key {
-            self.show_examples_fallback(format!(
-                "Unexpected puzzle collection response for {key}; showing bundled examples."
-            ));
+            self.file_error = Some(format!("{key}: unexpected collection response."));
             self.show(context);
             return;
         }
-
-        let parsed = match result {
-            StoreResult::Loaded {
-                value: Some(bytes), ..
-            } => parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}")),
-            StoreResult::Loaded { value: None, .. } => {
-                Err(format!("{key}: the puzzle collection no longer exists."))
+        if matches!(result, StoreResult::Denied(kobo_sdk::StoreError::TooFull)) {
+            let mode = if load.kind == CollectionLoadKind::Metadata {
+                ReadMode::Metadata
+            } else {
+                ReadMode::Complete
+            };
+            match CollectionReader::begin(context, key, mode) {
+                Ok(reader) => self.collection_reader = Some(reader),
+                Err(error) => self.finish_collection_load(context, key, Err(error)),
             }
-            StoreResult::Denied(error) => Err(format!("{key}: could not be read ({error}).")),
+            return;
+        }
+        let parsed = match result {
+            StoreResult::Loaded { value: Some(bytes), .. } =>
+                parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}")),
+            StoreResult::Loaded { value: None, .. } =>
+                Err(format!("{key}: the puzzle collection no longer exists.")),
+            StoreResult::Denied(error) =>
+                Err(format!("{key}: could not be read ({error}).")),
             _ => Err(format!("{key}: unexpected store response.")),
         };
+        self.finish_collection_load(context, key, parsed);
+    }
 
-        match load.kind {
-            CollectionLoadKind::Metadata => {
-                self.update_collection_metadata(key, &parsed);
-                self.load_next_metadata(context);
+    fn on_shelf(&mut self, context: &mut Context, name: &str, result: StoreResult) {
+        let Some(mut reader) = self.collection_reader.take() else { return };
+        if reader.wire_name() != name {
+            self.collection_reader = Some(reader);
+            return;
+        }
+        let key = reader.key().to_owned();
+        match reader.advance(context, result) {
+            ReadProgress::Pending => self.collection_reader = Some(reader),
+            ReadProgress::Metadata => self.finish_metadata_probe(context, &key),
+            ReadProgress::Complete(bytes) => {
+                let parsed = parse_puzzle_file(&bytes)
+                    .map_err(|error| format!("{key}: {error}"));
+                self.finish_collection_load(context, &key, parsed);
             }
-            CollectionLoadKind::Initial => match parsed {
-                Ok(collection) => {
-                    let title = collection.title.clone();
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
-                    {
-                        entry.title = title;
-                        entry.valid = true;
-                        entry.error = None;
-                    }
-                    self.activate_collection(Some(key.to_owned()), collection);
-                    self.show(context);
-                }
-                Err(error) => {
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
-                    {
-                        entry.valid = false;
-                        entry.error = Some(error.clone());
-                    }
-                    self.show_examples_fallback(format!(
-                        "{error} Showing bundled examples instead."
-                    ));
-                    self.show(context);
-                }
-            },
-            CollectionLoadKind::Selection => match parsed {
-                Ok(collection) => {
-                    let title = collection.title.clone();
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
-                    {
-                        entry.title = title;
-                        entry.valid = true;
-                        entry.error = None;
-                    }
-                    self.activate_collection(Some(key.to_owned()), collection);
-                    self.remember_active_collection();
-                    self.save_progress(context);
-                    self.show(context);
-                }
-                Err(error) => {
-                    if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
-                    {
-                        entry.valid = false;
-                        entry.error = Some(error.clone());
-                    }
-                    self.file_error = Some(error);
-                    self.show(context);
-                }
-            },
+            ReadProgress::Failed(error) => {
+                self.finish_collection_load(context, &key, Err(error));
+            }
         }
     }
 

@@ -4,7 +4,7 @@ use crate::board::{Board, Color};
 use serde::Deserialize;
 use std::collections::HashSet;
 
-pub const MAX_PUZZLE_FILE_BYTES: usize = 256 * 1024;
+pub const MAX_PUZZLE_FILE_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -53,7 +53,7 @@ impl Puzzle {
 
 pub fn parse_puzzle_file(contents: &[u8]) -> Result<PuzzleCollection, String> {
     if contents.len() > MAX_PUZZLE_FILE_BYTES {
-        return Err("Puzzle file must be at most 256 KiB.".into());
+        return Err("Puzzle file must be at most 8 MiB.".into());
     }
     let mut file: PuzzleCollection = serde_json::from_slice(contents)
         .map_err(|error| format!("Invalid puzzle file: {error}"))?;
