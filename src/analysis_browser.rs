@@ -72,7 +72,8 @@ impl AnalysisBrowser {
     }
 
     pub fn select_id(&mut self, tree: Option<&AnalysisTree>, id: &str) -> bool {
-        let Some((tree, node)) = tree.and_then(|tree| tree.by_id(id).map(|node| (tree, node))) else {
+        let Some((tree, node)) = tree.and_then(|tree| tree.by_id(id).map(|node| (tree, node)))
+        else {
             return false;
         };
         self.select(Some(tree), node)
@@ -195,8 +196,12 @@ mod tests {
 
     #[test]
     fn legacy_descriptions_open_without_inventing_tree_positions() {
-        let with_description = legacy(r#"{"version":1,"puzzles":[{"id":"legacy","fen":"7k/8/5KQ1/8/8/8/8/8 w - - 0 1","description":"Read this","solution":["g6g7"]}]}"#);
-        let without_description = legacy(r#"{"version":1,"puzzles":[{"id":"empty","fen":"7k/8/5KQ1/8/8/8/8/8 w - - 0 1","solution":["g6g7"]}]}"#);
+        let with_description = legacy(
+            r#"{"version":1,"puzzles":[{"id":"legacy","fen":"7k/8/5KQ1/8/8/8/8/8 w - - 0 1","description":"Read this","solution":["g6g7"]}]}"#,
+        );
+        let without_description = legacy(
+            r#"{"version":1,"puzzles":[{"id":"empty","fen":"7k/8/5KQ1/8/8/8/8/8 w - - 0 1","solution":["g6g7"]}]}"#,
+        );
         let mut browser = AnalysisBrowser::default();
         assert!(!browser.open(&without_description));
         assert!(browser.open(&with_description));

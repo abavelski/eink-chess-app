@@ -402,9 +402,7 @@ impl ChessBoardApp {
     }
 
     fn displayed_board(&self) -> &Board {
-        self.analysis_browser
-            .preview_board()
-            .unwrap_or(&self.board)
+        self.analysis_browser.preview_board().unwrap_or(&self.board)
     }
 
     fn note_progress_change(&mut self) {
@@ -2803,17 +2801,33 @@ mod tests {
         let (mut runner, _) = runner(Some(rich_with_continuation()));
         assert_no_progress_write(&play(&mut runner, "h2h1q"));
         assert_eq!(runner.app().solution_ply, 2);
-        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Correct));
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Correct)
+        );
         let before = attempt_snapshot(runner.app());
         let node = runner.app().puzzles[0]
-            .analysis.as_ref().unwrap().by_id("n2").unwrap();
+            .analysis
+            .as_ref()
+            .unwrap()
+            .by_id("n2")
+            .unwrap();
         let alternative_fen = runner.app().puzzles[0]
-            .analysis.as_ref().unwrap().node(node).unwrap().fen().to_owned();
+            .analysis
+            .as_ref()
+            .unwrap()
+            .node(node)
+            .unwrap()
+            .fen()
+            .to_owned();
 
         assert!(runner.app_mut().open_analysis());
         assert_eq!(runner.app().displayed_board(), &before.board);
         assert!(runner.app_mut().select_analysis_node(node));
-        assert_eq!(runner.app().analysis_browser.preview_fen(), Some(alternative_fen.as_str()));
+        assert_eq!(
+            runner.app().analysis_browser.preview_fen(),
+            Some(alternative_fen.as_str())
+        );
         assert_eq!(
             runner.app().displayed_board(),
             &Board::from_fen(&alternative_fen).unwrap()
@@ -2844,9 +2858,15 @@ mod tests {
 
         let commands = play(&mut runner, "h1h2");
         assert_eq!(runner.app().solution_ply, 3);
-        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Complete));
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Complete)
+        );
         assert!(runner.app().current_is_solved());
-        assert!(progress_bytes(&commands).is_some(), "only actual solution completion saves");
+        assert!(
+            progress_bytes(&commands).is_some(),
+            "only actual solution completion saves"
+        );
     }
 
     #[test]
@@ -2858,11 +2878,21 @@ mod tests {
 
         for (id, kind) in [("n2", PieceKind::Knight), ("n3", PieceKind::Rook)] {
             let node = runner.app().puzzles[0]
-                .analysis.as_ref().unwrap().by_id(id).unwrap();
+                .analysis
+                .as_ref()
+                .unwrap()
+                .by_id(id)
+                .unwrap();
             assert!(runner.app_mut().select_analysis_node(node));
             assert_eq!(
-                runner.app().displayed_board().piece_at(square_from_name("h1").unwrap()),
-                Some(Piece { color: Color::Black, kind })
+                runner
+                    .app()
+                    .displayed_board()
+                    .piece_at(square_from_name("h1").unwrap()),
+                Some(Piece {
+                    color: Color::Black,
+                    kind
+                })
             );
             assert_eq!(attempt_snapshot(runner.app()), before);
         }
@@ -2875,12 +2905,21 @@ mod tests {
 
         assert_no_progress_write(&play(&mut runner, "h2h1n"));
         assert_eq!(runner.app().solution_ply, 0);
-        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Wrong));
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Wrong)
+        );
         assert!(!runner.app().current_is_solved());
-        assert_eq!(runner.app().progress.to_bytes().unwrap(), before.progress_bytes);
+        assert_eq!(
+            runner.app().progress.to_bytes().unwrap(),
+            before.progress_bytes
+        );
         assert_eq!(runner.app().progress_generation, before.progress_generation);
         let commands = play(&mut runner, "h2h1q");
-        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Complete));
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Complete)
+        );
         assert!(runner.app().current_is_solved());
         assert!(progress_bytes(&commands).is_some());
     }
@@ -2892,7 +2931,11 @@ mod tests {
             ("puzzles-endgames.json", ALT_PUZZLES.to_vec()),
         ]);
         let target = runner.app().puzzles[0]
-            .analysis.as_ref().unwrap().by_id("n2").unwrap();
+            .analysis
+            .as_ref()
+            .unwrap()
+            .by_id("n2")
+            .unwrap();
         let h2 = square_from_name("h2").unwrap();
         let h1 = square_from_name("h1").unwrap();
         runner.action(action_id(&square_action(h2)));
@@ -2929,8 +2972,12 @@ mod tests {
 
         assert!(runner.app_mut().open_analysis());
         assert!(runner.app_mut().select_analysis_node(target));
-        let index = runner.app().collections.iter()
-            .position(|entry| entry.key == "puzzles-endgames.json").unwrap();
+        let index = runner
+            .app()
+            .collections
+            .iter()
+            .position(|entry| entry.key == "puzzles-endgames.json")
+            .unwrap();
         runner.action(action_id(PUZZLE_PICKER));
         let commands = runner.action(action_id(&collection_action(index)));
         assert!(!runner.app().analysis_browser.is_open());
@@ -2957,14 +3004,17 @@ mod tests {
         assert_eq!(runner.app().puzzle_index, 0);
     }
 
-
     #[test]
     fn suspend_and_resume_discard_preview_but_keep_the_live_attempt() {
         let (mut runner, _) = runner(Some(rich_with_continuation()));
         play(&mut runner, "h2h1q");
         let before = attempt_snapshot(runner.app());
-        let alternative = runner.app().puzzles[0].analysis
-            .as_ref().unwrap().by_id("n2").unwrap();
+        let alternative = runner.app().puzzles[0]
+            .analysis
+            .as_ref()
+            .unwrap()
+            .by_id("n2")
+            .unwrap();
         assert!(runner.app_mut().open_analysis());
         assert!(runner.app_mut().select_analysis_node(alternative));
         assert_ne!(runner.app().displayed_board(), &before.board);
@@ -2983,7 +3033,6 @@ mod tests {
         play(&mut runner, "h1h2");
         assert!(runner.app().current_is_solved());
     }
-
 }
 
 fn main() -> ExitCode {
@@ -2994,6 +3043,4 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
-
-
 }
