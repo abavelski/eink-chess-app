@@ -1,3 +1,4 @@
+mod analysis;
 mod board;
 mod large_collection;
 mod progress;

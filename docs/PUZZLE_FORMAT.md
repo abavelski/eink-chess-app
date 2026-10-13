@@ -50,9 +50,52 @@ current app.
 | `id` | Yes | A nonempty string, unique within the file. |
 | `fen` | Yes | The complete six-field FEN at the moment the solver should move. |
 | `description` | No | An explanation displayed below the board and toolbar after solving or when the description toggle is active. Use `\n` for line breaks. May be omitted, empty, or `null`. |
+| `topic` | No | Optional UTF-8 string (including newlines); null or non-string is ignored. Rich metadata only; not yet shown in the UI. |
+| `description_content` | No | Strict structured text spans for later analysis rendering; omitted means plain description fallback. |
+| `analysis` | No | Version-1 validated analysis tree with ordered branches; ignored for grading. |
 | `difficulty` | No | A string or number shown in parentheses after the puzzle ID in the header, for example `"Hard"` or `4`. May be omitted or `null`. |
 | `solution` | Yes | A nonempty array of UCI moves, beginning with the solver's move and including alternating opponent replies. |
 | `source` | No | Optional provenance URL, ignored by the current app. |
+
+
+## Optional rich analysis (phase-two parser)
+
+Legacy version-1 collections remain valid and require no changes. The app now
+validates and retains optional rich metadata from the pinned Kindle additive-v1
+contract. Puzzle `solution` remains required and is the only sequence checked
+for success; `analysis` is not used to grade moves.
+
+When present, `analysis` must have `"version": 1`, a `root` node ID, and a
+nonempty array of `nodes`. IDs must be unique. The root's FEN must match the
+puzzle FEN exactly, and it must not have `parent`, `move`, `role`, or `nags`.
+Every other node must have exactly one parent, a post-move six-field FEN,
+and a move with exactly `uci` and nonempty `san` fields. Parent/child links
+must be connected, acyclic, mutually consistent, and contain each node once.
+The order of nodes and `children` is preserved. Unspecified children are
+empty, and non-root roles default to `sideline`; explicit roles may be `main`,
+`alternative`, or `sideline`. Following the sole `main` child at each step
+must reproduce `solution` exactly; other branches cannot be graded.
+
+`description_content` and each node's `content` are arrays of strict spans:
+
+- `{"type":"text","text":"Words"}` for nonempty, non-interactive text;
+- `{"type":"move_ref","node":"n1","label":"optional display label"}` for a
+  reference to a non-root node in the same tree. The label is optional and
+  must be nonempty when present; without it, rendering uses the target SAN.
+
+Extra or missing span keys, unknown span types, dangling/root references, and
+invalid spans are rejected. SAN-looking words in text are never converted to
+references. When content is omitted, it falls back to a single text span from
+nonempty `comment` (or `description` for puzzle prose); an explicitly present
+empty array means no spans, not fallback text. Node `nags` default to empty
+and, when provided, must be nonnegative integers. The reader validates
+FEN/UCI syntax but deliberately does not validate move legality.
+
+The parser enforces **8 MiB (8,388,608 raw bytes)** independently of the
+Kobo collection loader. Larger books require the Cobalt range adapter
+described above; parser acceptance alone does not guarantee device loading.
+The normative format is the
+[pin at 80eaf892](https://github.com/abavelski/kindle-chess-puzzles/blob/80eaf892fe0c7a96e3ba603e25ee3af57e3d93c8/docs/PUZZLE_FORMAT.md#phase-two-rich-analysis-extension).
 
 ## Whose turn and board orientation
 
@@ -80,7 +123,7 @@ uses the king's move, such as `e1g1`.
 For a two-move solution, the array normally contains the solver's first move,
 the opponent's reply, and the solver's second move. The file represents one
 main solution line; branching alternatives can be introduced in a later
-format version.
+format version. Optional rich analysis already supports branches as parser data; the Kobo UI does not yet expose them.
 
 The app validates FENs and move notation, displays the turn,
 and uses the solution as an exact move sequence. The user enters only the solver
