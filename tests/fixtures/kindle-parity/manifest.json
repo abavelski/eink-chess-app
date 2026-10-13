@@ -5,7 +5,7 @@
   "normative_spec_git_blob_sha1": "1076d9a09087b7e0b56b1c8d8fd6e54f0f81dcfa",
   "raw_file_limit_bytes": 8388608,
   "legacy_control": {
-    "path": "examples/puzzles.json",
+    "path": "tests/fixtures/kobo-legacy-main-example.json",
     "sha256": "0521825d87640c69b5989c16748c6d92189f3d3edb34dd2ab612884314599e88"
   },
   "fixtures": [
@@ -141,5 +141,9 @@
       "git_blob_sha1": "c30433d83cca34d47acb8ab04569f5ea81ac10d5",
       "expected": "valid"
     }
-  ]
+  ],
+  "current_app_example": {
+    "path": "examples/puzzles.json",
+    "sha256": "849d4e8463e55e696fffd7ca6f4cb5a1f3dfc12b3b6705b817de4767cb1069eb"
+  }
 }
