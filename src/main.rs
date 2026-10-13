@@ -4,11 +4,11 @@ mod progress;
 mod puzzle;
 
 use board::{Board, Color, Piece, PieceKind, TapResult};
-use large_collection::{CollectionReader, ReadMode, ReadProgress};
 use kobo_sdk::{
     action_id, ActionId, BandAlign, BannerLevel, Context, Glyph, KoboApp, Screen, ScreenBuilder,
     SlotWidth, StoreResult,
 };
+use large_collection::{CollectionReader, ReadMode, ReadProgress};
 use progress::Progress;
 use puzzle::{parse_puzzle_file, Puzzle, PuzzleCollection};
 use std::{collections::VecDeque, process::ExitCode};
@@ -232,7 +232,9 @@ impl ChessBoardApp {
         key: &str,
         parsed: Result<PuzzleCollection, String>,
     ) {
-        let Some(load) = self.collection_load.take() else { return };
+        let Some(load) = self.collection_load.take() else {
+            return;
+        };
         if load.key != key {
             self.file_error = Some(format!("{key}: unexpected collection response."));
             self.show(context);
@@ -294,9 +296,13 @@ impl ChessBoardApp {
     }
 
     fn finish_metadata_probe(&mut self, context: &mut Context, key: &str) {
-        if !self.collection_load.as_ref().is_some_and(|load|
-            load.key == key && load.kind == CollectionLoadKind::Metadata
-        ) { return; }
+        if !self
+            .collection_load
+            .as_ref()
+            .is_some_and(|load| load.key == key && load.kind == CollectionLoadKind::Metadata)
+        {
+            return;
+        }
         self.collection_load = None;
         if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key) {
             // A first chunk proves accessibility and a bounded size, but is not
@@ -876,7 +882,9 @@ impl KoboApp for ChessBoardApp {
             self.handle_progress_load(result);
             return;
         }
-        let Some(load) = self.collection_load.as_ref() else { return };
+        let Some(load) = self.collection_load.as_ref() else {
+            return;
+        };
         if load.key != key {
             self.file_error = Some(format!("{key}: unexpected collection response."));
             self.show(context);
@@ -895,19 +903,22 @@ impl KoboApp for ChessBoardApp {
             return;
         }
         let parsed = match result {
-            StoreResult::Loaded { value: Some(bytes), .. } =>
-                parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}")),
-            StoreResult::Loaded { value: None, .. } =>
-                Err(format!("{key}: the puzzle collection no longer exists.")),
-            StoreResult::Denied(error) =>
-                Err(format!("{key}: could not be read ({error}).")),
+            StoreResult::Loaded {
+                value: Some(bytes), ..
+            } => parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}")),
+            StoreResult::Loaded { value: None, .. } => {
+                Err(format!("{key}: the puzzle collection no longer exists."))
+            }
+            StoreResult::Denied(error) => Err(format!("{key}: could not be read ({error}).")),
             _ => Err(format!("{key}: unexpected store response.")),
         };
         self.finish_collection_load(context, key, parsed);
     }
 
     fn on_shelf(&mut self, context: &mut Context, name: &str, result: StoreResult) {
-        let Some(mut reader) = self.collection_reader.take() else { return };
+        let Some(mut reader) = self.collection_reader.take() else {
+            return;
+        };
         if reader.wire_name() != name {
             self.collection_reader = Some(reader);
             return;
@@ -917,8 +928,7 @@ impl KoboApp for ChessBoardApp {
             ReadProgress::Pending => self.collection_reader = Some(reader),
             ReadProgress::Metadata => self.finish_metadata_probe(context, &key),
             ReadProgress::Complete(bytes) => {
-                let parsed = parse_puzzle_file(&bytes)
-                    .map_err(|error| format!("{key}: {error}"));
+                let parsed = parse_puzzle_file(&bytes).map_err(|error| format!("{key}: {error}"));
                 self.finish_collection_load(context, &key, parsed);
             }
             ReadProgress::Failed(error) => {
@@ -1450,7 +1460,12 @@ mod tests {
         data: &[u8],
         response_error: Option<kobo_sdk::StoreError>,
     ) -> Vec<Command> {
-        let index = runner.app().collections.iter().position(|entry| entry.key == key).unwrap();
+        let index = runner
+            .app()
+            .collections
+            .iter()
+            .position(|entry| entry.key == key)
+            .unwrap();
         runner.action(action_id(PUZZLE_PICKER));
         let commands = runner.action(action_id(&collection_action(index)));
         assert!(commands.iter().any(|command| matches!(command,
@@ -1461,7 +1476,12 @@ mod tests {
         while !pending.is_empty() {
             let mut next = Vec::new();
             for command in pending {
-                if let Command::Store(StoreRequest::ShelfRead { name, offset, length }) = &command {
+                if let Command::Store(StoreRequest::ShelfRead {
+                    name,
+                    offset,
+                    length,
+                }) = &command
+                {
                     seen += 1;
                     assert!(seen <= 258, "two passes of 8 MiB at 64 KiB each");
                     assert_eq!(name, &format!("{}{}", large_collection::READ_PREFIX, key));
@@ -1517,10 +1537,7 @@ mod tests {
     #[test]
     fn failed_large_selection_never_changes_board_file_or_progress() {
         let key = "puzzles-large.json";
-        for payload in [
-            vec![0xff; 256 * 1024 + 1],
-            vec![b'{'; 256 * 1024 + 1],
-        ] {
+        for payload in [vec![0xff; 256 * 1024 + 1], vec![b'{'; 256 * 1024 + 1]] {
             let (mut runner, _) = runner_with_collections(vec![
                 (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
                 (key, ALT_PUZZLES.to_vec()),
@@ -1530,7 +1547,10 @@ mod tests {
             let commands = select_with_range_reply(&mut runner, key, &payload, None);
             assert_eq!(runner.app().board, old_board);
             assert_eq!(runner.app().progress, old_progress);
-            assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+            assert_eq!(
+                runner.app().active_collection.as_deref(),
+                Some(PUZZLES_FILE)
+            );
             assert!(runner.app().file_error.as_deref().unwrap().contains(key));
             assert!(!commands.iter().any(|command| matches!(command,
                 Command::Store(StoreRequest::Save { key, .. }) if key == PROGRESS_KEY)));
@@ -1543,12 +1563,23 @@ mod tests {
         let old_board = runner.app().board.clone();
         let old_progress = runner.app().progress.clone();
         select_with_range_reply(
-            &mut runner, key, ALT_PUZZLES, Some(kobo_sdk::StoreError::Missing)
+            &mut runner,
+            key,
+            ALT_PUZZLES,
+            Some(kobo_sdk::StoreError::Missing),
         );
         assert_eq!(runner.app().board, old_board);
         assert_eq!(runner.app().progress, old_progress);
-        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
-        assert!(runner.app().file_error.as_deref().unwrap().contains("runtime lacks"));
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some(PUZZLES_FILE)
+        );
+        assert!(runner
+            .app()
+            .file_error
+            .as_deref()
+            .unwrap()
+            .contains("runtime lacks"));
     }
 
     #[test]
