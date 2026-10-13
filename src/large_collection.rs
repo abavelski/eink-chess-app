@@ -21,7 +21,9 @@ pub enum ReadMode {
 }
 
 impl Default for ReadMode {
-    fn default() -> Self { Self::Complete }
+    fn default() -> Self {
+        Self::Complete
+    }
 }
 
 #[derive(Debug)]
@@ -51,7 +53,11 @@ pub fn collection_key(key: &str) -> bool {
             .is_some_and(|name| {
                 !name.is_empty()
                     && name.bytes().all(|b| {
-                        b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_' || b == b'.'
+                        b.is_ascii_lowercase()
+                            || b.is_ascii_digit()
+                            || b == b'-'
+                            || b == b'_'
+                            || b == b'.'
                     })
             })
 }
@@ -70,7 +76,9 @@ impl CollectionReader {
             verify_offset: 0,
             verifying: false,
         };
-        context.shelf().read(reader.wire_name.clone(), 0, READ_CHUNK as u32);
+        context
+            .shelf()
+            .read(reader.wire_name.clone(), 0, READ_CHUNK as u32);
         Ok(reader)
     }
 
@@ -160,13 +168,14 @@ impl CollectionReader {
         } else {
             self.first_pass.len()
         };
-        context
-            .shelf()
-            .read(self.wire_name.clone(), next_offset as u32, READ_CHUNK as u32);
+        context.shelf().read(
+            self.wire_name.clone(),
+            next_offset as u32,
+            READ_CHUNK as u32,
+        );
         ReadProgress::Pending
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -183,7 +192,10 @@ mod tests {
 
     impl Probe {
         fn new(mode: ReadMode) -> Self {
-            Self { mode, ..Self::default() }
+            Self {
+                mode,
+                ..Self::default()
+            }
         }
     }
 
@@ -218,7 +230,12 @@ mod tests {
             assert!(requests <= 300, "bounded request count");
             let mut next = Vec::new();
             for command in pending {
-                let Command::Store(StoreRequest::ShelfRead { name, offset, length }) = command else {
+                let Command::Store(StoreRequest::ShelfRead {
+                    name,
+                    offset,
+                    length,
+                }) = command
+                else {
                     panic!("unexpected Cobalt command");
                 };
                 assert!(name.starts_with(READ_PREFIX));
@@ -249,10 +266,17 @@ mod tests {
 
     #[test]
     fn all_boundaries_are_byte_exact_with_fixed_size_requests() {
-        for size in [256_usize * 1024, 256 * 1024 + 1, 1024 * 1024,
-            3 * 1024 * 1024, 5 * 1024 * 1024, 8 * 1024 * 1024]
-        {
-            let original = (0..size).map(|i| (i.wrapping_mul(37) % 251) as u8).collect::<Vec<_>>();
+        for size in [
+            256_usize * 1024,
+            256 * 1024 + 1,
+            1024 * 1024,
+            3 * 1024 * 1024,
+            5 * 1024 * 1024,
+            8 * 1024 * 1024,
+        ] {
+            let original = (0..size)
+                .map(|i| (i.wrapping_mul(37) % 251) as u8)
+                .collect::<Vec<_>>();
             let (done, requests, max_request) = run(&original, ReadMode::Complete, normal);
             assert_eq!(done.outcome.unwrap().unwrap(), original, "size {size}");
             assert_eq!(requests, (size + READ_CHUNK - 1) / READ_CHUNK * 2);
@@ -283,7 +307,9 @@ mod tests {
         let short = |n, off, len, data: &[u8]| {
             let mut reply = normal(n, off, len, data);
             if n == 2 {
-                if let StoreResult::ShelfRead { bytes, .. } = &mut reply { bytes.pop(); }
+                if let StoreResult::ShelfRead { bytes, .. } = &mut reply {
+                    bytes.pop();
+                }
             }
             reply
         };
@@ -292,39 +318,69 @@ mod tests {
         let order = |n, off, len, data: &[u8]| {
             let mut reply = normal(n, off, len, data);
             if n == 2 {
-                if let StoreResult::ShelfRead { offset, .. } = &mut reply { *offset = 0; }
+                if let StoreResult::ShelfRead { offset, .. } = &mut reply {
+                    *offset = 0;
+                }
             }
             reply
         };
-        assert!(run(&data, ReadMode::Complete, order).0.outcome.unwrap().is_err());
+        assert!(run(&data, ReadMode::Complete, order)
+            .0
+            .outcome
+            .unwrap()
+            .is_err());
         let changed = |n, off, len, data: &[u8]| {
             let mut reply = normal(n, off, len, data);
             if n == 5 {
-                if let StoreResult::ShelfRead { bytes, .. } = &mut reply { bytes[0] ^= 1; }
+                if let StoreResult::ShelfRead { bytes, .. } = &mut reply {
+                    bytes[0] ^= 1;
+                }
             }
             reply
         };
-        assert!(run(&data, ReadMode::Complete, changed).0.outcome.unwrap().is_err());
+        assert!(run(&data, ReadMode::Complete, changed)
+            .0
+            .outcome
+            .unwrap()
+            .is_err());
         let size_change = |n, off, len, data: &[u8]| {
             let mut reply = normal(n, off, len, data);
             if n == 2 {
-                if let StoreResult::ShelfRead { size, .. } = &mut reply { *size += 1; }
+                if let StoreResult::ShelfRead { size, .. } = &mut reply {
+                    *size += 1;
+                }
             }
             reply
         };
-        assert!(run(&data, ReadMode::Complete, size_change).0.outcome.unwrap().is_err());
+        assert!(run(&data, ReadMode::Complete, size_change)
+            .0
+            .outcome
+            .unwrap()
+            .is_err());
         let missing = |n, off, len, data: &[u8]| {
-            if n == 2 { StoreResult::Denied(StoreError::Missing) }
-            else { normal(n, off, len, data) }
+            if n == 2 {
+                StoreResult::Denied(StoreError::Missing)
+            } else {
+                normal(n, off, len, data)
+            }
         };
-        assert!(run(&data, ReadMode::Complete, missing).0.outcome.unwrap().is_err());
+        assert!(run(&data, ReadMode::Complete, missing)
+            .0
+            .outcome
+            .unwrap()
+            .is_err());
     }
 
     #[test]
     fn denied_and_unpatched_runtime_report_named_errors() {
-        for error in [StoreError::Unwritable, StoreError::Missing, StoreError::TooFull] {
-            let (state, requests, _) = run(b"hello", ReadMode::Complete,
-                |_n, _o, _l, _| StoreResult::Denied(error));
+        for error in [
+            StoreError::Unwritable,
+            StoreError::Missing,
+            StoreError::TooFull,
+        ] {
+            let (state, requests, _) = run(b"hello", ReadMode::Complete, |_n, _o, _l, _| {
+                StoreResult::Denied(error)
+            });
             let reason = state.outcome.unwrap().unwrap_err();
             assert!(reason.contains("puzzles.json"));
             if error == StoreError::Missing {
