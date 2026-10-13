@@ -24,8 +24,8 @@ command -v rustup >/dev/null || fail "rustup is required"
 
 [[ -f "${COBALT_DIR}/Cargo.toml" ]] || fail "Cobalt checkout not found at ${COBALT_DIR}"
 
-if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "1af8797ee06457d637b94bd42972bc907e5d82d1" ]]; then
-    fail "Cobalt is not at the pinned revision 1af8797ee06457d637b94bd42972bc907e5d82d1"
+if [[ "$(git -C "${COBALT_DIR}" rev-parse HEAD)" != "ff4ec9950e178243807082bf818e42c8538d080e" ]]; then
+    fail "Cobalt is not at the pinned revision ff4ec9950e178243807082bf818e42c8538d080e"
 fi
 
 printf '%s\n' 'Preparing pinned Cobalt with the current E-Ink Chess sources…'

@@ -13,35 +13,59 @@ To install on a connected Kobo, follow **[USB device installation](docs/DEVICE_I
 If the reader already has the older `NickelMenu -> Cobalt -> Chess` build,
 follow **[Update to direct launch](docs/DEVICE_UPDATE_DIRECT_LAUNCH.md)**.
 
-The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine and no chess rules yet.
+The first target is **Kobo Libra H2O** using the [Cobalt](https://github.com/BandarLabs/Cobalt) SDK. There is no chess engine or legal-move enforcement; puzzle correctness is checked against the stored UCI solution line.
 
 ## MVP
 
 - 8×8 board
-- load puzzles with a FEN, optional description, and solution from JSON
-- browse saved puzzles with the Kobo page-turn buttons
+- load multiple puzzle collections with FENs, descriptions, and solutions from JSON
+- switch collections from the on-device **Puzzles** picker
+- browse puzzles in the active collection with the Kobo page-turn buttons
+- remember the active collection, each collection's current puzzle, and solved puzzles
+- show an explicit **Solved** marker when revisiting completed puzzles
 - face the board toward the side to move, with a manual Flip control
 - touch a piece to select it
-- touch any square to move it
+- touch a square to attempt the next solution move
+- show a small Correct hint or a centered thumbs result over the board
+- automatically apply stored opponent replies between solver moves
+- reject a wrong move and restore the previous position
+- choose Queen, Rook, Bishop, or Knight when a pawn reaches the last rank
+- switch between graded **Solution** mode and an ungraded **Free board**
 - touch the selected piece again to deselect it
-- moving onto another piece simply replaces it
-- reset the board to the current FEN position
+- reset the board and solution attempt to the current FEN position
 - return cleanly to the Kobo reader
 
-That is intentional: version 0.1 behaves like a physical board and position
-viewer, not a chess game. It does not enforce legal moves or play turns.
+The app is still intentionally not a chess game or engine. In **Solution**
+mode it does not enforce legal chess moves; it only checks whether the attempted
+move matches the next stored UCI move and applies the stored opponent reply.
+**Free board** mode turns the current position into a physical scratch board:
+moves are not graded and do not advance the solution. The leftmost grid icon in
+the three-button toolbar toggles this mode; its gray fill shows when Free board
+is active. Tapping it again returns to Solution, restores the puzzle FEN, and
+restarts the attempt while preserving the current board orientation.
 
-Place a UTF-8 `puzzles.json` file at
-`.adds/cobalt/state/eink-chess/puzzles.json` on the mounted reader while the app
-is closed. The [puzzle file format](docs/PUZZLE_FORMAT.md) documents the fields.
-If the file is missing, the app creates the ten CC0 Lichess examples in
-[examples/puzzles.json](examples/puzzles.json). The deployment script also
-installs those examples when no puzzle file exists.
+Place UTF-8 puzzle collections in `.adds/cobalt/state/eink-chess/` on the
+mounted reader while the app is closed. The default collection is
+`puzzles.json`; additional collections use names such as
+`puzzles-endgames.json` or `puzzles-tactics.json`. The on-device **Puzzles**
+button opens a picker and uses each file's optional `title` as its display name.
+The [puzzle file format](docs/PUZZLE_FORMAT.md) documents the exact naming and
+fields. If no puzzle collection exists, the app creates the ten CC0 Lichess
+examples as `puzzles.json`.
 
-Page-turn buttons browse the puzzles. **Reset** restores the current puzzle's
-FEN; **Flip** changes the viewing side. Each newly selected puzzle automatically
-faces the color whose turn is recorded in the FEN. Solutions are loaded but
-are not yet checked or revealed. The old `positions.fen` file is no longer read.
+Page-turn buttons browse puzzles inside the active collection. **Puzzles**
+switches collections and restores the last puzzle visited in each collection.
+The active collection and per-file positions are restored after restarting the
+app. **Reset** restores the current puzzle's FEN and restarts its solution;
+**Flip** changes only the viewing side. Each newly selected puzzle automatically faces
+the color whose turn is recorded in the FEN.
+Solver moves are checked against the stored UCI line. Correct moves are accepted,
+stored opponent replies are applied automatically, and the turn line adds
+**Correct** until the next move. A wrong move is restored with a centered thumbs
+down; completing the solution shows a centered thumbs up. **Reset** removes
+either icon. Completed puzzle IDs are stored
+separately in `progress.v1`; uploaded puzzle JSON files are never modified.
+The old `positions.fen` file is no longer read.
 
 ## Architecture
 
@@ -79,7 +103,7 @@ Keeping the board model platform-neutral means a future Slint/Kindle frontend ca
 This project pins the Cobalt SDK to commit:
 
 ```text
-1af8797ee06457d637b94bd42972bc907e5d82d1
+ff4ec9950e178243807082bf818e42c8538d080e
 ```
 
 Cobalt provides the 8×8 touch board and partial e-ink refresh planning. This

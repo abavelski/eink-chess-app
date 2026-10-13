@@ -17,5 +17,11 @@ moves became the solution array. All setup and solution moves were checked
 for legality; the four mating lines were checked to finish in checkmate.
 python-chess is only a data preparation tool, not an app dependency.
 
+`promotion-puzzles.json` is a small hand-authored device-test collection for
+promotion behavior. It includes White queen promotion, White knight
+underpromotion, Black rook underpromotion, and an automatic opponent promotion
+reply. Copy it to the app's `puzzles.json` location while the app is closed to
+run the Task 02 hardware checklist.
+
 See [the puzzle format](../docs/PUZZLE_FORMAT.md) for editing and installation.
 `positions.fen` is the older board-viewer example file and is no longer loaded.
