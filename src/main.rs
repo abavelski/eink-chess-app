@@ -2,6 +2,7 @@ mod analysis;
 mod board;
 mod large_collection;
 mod progress;
+mod presentation;
 mod puzzle;
 
 use board::{Board, Color, Piece, PieceKind, TapResult};
@@ -11,6 +12,7 @@ use kobo_sdk::{
 };
 use large_collection::{CollectionReader, ReadMode, ReadProgress};
 use progress::Progress;
+use presentation::{solution_text, StatusMode};
 use puzzle::{parse_puzzle_file, Puzzle, PuzzleCollection};
 use std::{collections::VecDeque, process::ExitCode};
 
@@ -21,7 +23,6 @@ const FLIP: &str = "flip";
 const EXIT: &str = "exit";
 const MODE_TOGGLE: &str = "mode-toggle";
 const ORIENTATION_LOCK: &str = "orientation-lock";
-const DESCRIPTION_TOGGLE: &str = "description-toggle";
 const PUZZLE_PICKER: &str = "puzzle-picker";
 const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
 const COLLECTION_ACTION_PREFIX: &str = "collection-";
@@ -547,7 +548,6 @@ impl ChessBoardApp {
         };
         let free_board = self.mode == BoardMode::FreeBoard;
         let orientation_locked = self.orientation_locked;
-        let description_visible = self.description_visible;
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
@@ -562,19 +562,13 @@ impl ChessBoardApp {
                             as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
-                        // Five 10 mm targets with four 1 mm gaps.
-                        SlotWidth::Fixed(540),
+                        // Four 10 mm targets with three 1 mm gaps. Analysis replaces NOTE in Task 06.
+                        SlotWidth::Fixed(430),
                         Box::new(move |slot| {
                             slot.controls_with_selection(
-                                5,
+                                4,
                                 [
                                     (MODE_TOGGLE, "Toggle free board", Glyph::Grid, free_board),
-                                    (
-                                        DESCRIPTION_TOGGLE,
-                                        "Toggle solution description",
-                                        Glyph::Note,
-                                        description_visible,
-                                    ),
                                     (
                                         ORIENTATION_LOCK,
                                         "Toggle orientation lock",
@@ -591,31 +585,20 @@ impl ChessBoardApp {
             );
 
         if let Some(puzzle) = self.puzzles.get(self.puzzle_index) {
-            let status = match self.mode {
-                BoardMode::Solution => match puzzle.side_to_move() {
-                    Color::White => "White to move",
-                    Color::Black => "Black to move",
+            let view = solution_text(
+                puzzle,
+                if self.mode == BoardMode::Solution {
+                    StatusMode::Solution
+                } else {
+                    StatusMode::FreeBoard
                 },
-                BoardMode::FreeBoard => "Free board",
-            };
-            let status = if self.mode == BoardMode::Solution
-                && self.solution_feedback == Some(SolutionFeedback::Correct)
-            {
-                format!("{status} · Correct")
-            } else if self.current_is_solved() {
-                format!("{status} · Solved")
-            } else {
-                status.to_owned()
-            };
-            screen = screen.secondary(status);
-            if self.description_visible {
-                if let Some(description) = puzzle
-                    .description
-                    .as_deref()
-                    .filter(|text| !text.trim().is_empty())
-                {
-                    screen = screen.text(description);
-                }
+                self.solution_feedback == Some(SolutionFeedback::Correct),
+                self.current_is_solved(),
+                self.description_visible,
+            );
+            screen = screen.secondary(view.status);
+            if let Some(description) = view.revealed_description {
+                screen = screen.text(description);
             }
         }
         if let Some(error) = self.file_error.as_ref() {
@@ -985,12 +968,6 @@ impl KoboApp for ChessBoardApp {
                 BoardMode::Solution => BoardMode::FreeBoard,
                 BoardMode::FreeBoard => BoardMode::Solution,
             });
-            self.show(context);
-            return;
-        }
-
-        if action == action_id(DESCRIPTION_TOGGLE) {
-            self.description_visible = !self.description_visible;
             self.show(context);
             return;
         }
@@ -1711,68 +1688,74 @@ mod tests {
     }
 
     #[test]
-    fn description_toggle_works_before_and_after_solving_and_in_free_board() {
+    fn note_control_is_hidden_but_description_and_progress_survive() {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let description = runner.app().puzzles[0].description.clone().unwrap();
-        let has_description = |app: &ChessBoardApp| {
-            app.screen().nodes.iter().any(
-                |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
-            )
-        };
         let initial_board = runner.app().board.clone();
-        runner.action(action_id(DESCRIPTION_TOGGLE));
-        assert!(has_description(runner.app()));
-        assert_eq!(runner.app().board, initial_board);
+        let initial_generation = runner.app().progress_generation;
+        let preface = crate::presentation::analysis_text(&runner.app().puzzles[0]);
+        assert!(preface.available());
+        assert_eq!(
+            preface.preface,
+            &[crate::analysis::ContentSpan::Text(description.clone())]
+        );
         assert_eq!(runner.app().solution_ply, 0);
-        assert!(!runner.app().current_is_solved());
-        let diagnostics = runner
-            .app()
-            .screen()
-            .diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert_eq!(runner.app().progress_generation, initial_generation);
+        assert_eq!(runner.app().board, initial_board);
+
+        let screen = runner.app().screen();
+        assert!(!screen.nodes.iter().any(|node| {
+            matches!(node, kobo_sdk::Node::Cell { .. })
+        }), "toolbar uses the Cobalt control-node representation");
+        let diagnostics =
+            screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
         assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
-        assert!(diagnostics.layout.nodes.iter().any(|node| {
-            matches!(node.kind, kobo_sdk::LayoutKind::Cell(action, _, true)
-                if action == action_id(DESCRIPTION_TOGGLE))
+        assert!(!diagnostics.layout.nodes.iter().any(|node| {
+            node.kind.acts_on() == Some(action_id("description-toggle"))
         }));
-        runner.action(action_id(DESCRIPTION_TOGGLE));
-        assert!(!has_description(runner.app()));
+        assert!(!screen.nodes.iter().any(
+            |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+        ));
 
         play(&mut runner, "d7e8");
-        assert!(
-            has_description(runner.app()),
-            "solving still reveals the description"
-        );
-        runner.action(action_id(DESCRIPTION_TOGGLE));
-        assert!(
-            !has_description(runner.app()),
-            "a solved description can be hidden"
-        );
+        assert!(runner.app().screen().nodes.iter().any(
+            |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+        ));
         assert!(runner.app().current_is_solved());
-        runner.action(action_id(DESCRIPTION_TOGGLE));
-        assert!(has_description(runner.app()));
         runner.action(action_id(RESET));
-        assert!(!has_description(runner.app()));
+        assert!(runner.app().current_is_solved());
+        assert!(!runner.app().description_visible);
         runner.action(action_id(MODE_TOGGLE));
-        runner.action(action_id(DESCRIPTION_TOGGLE));
-        assert!(
-            has_description(runner.app()),
-            "manual reveal also works in Free board"
-        );
-        runner.page_turn(true);
-        assert!(
-            !runner.app().description_visible,
-            "navigation hides the next solution"
-        );
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        assert!(!runner.app().description_visible);
+    }
+
+    #[test]
+    fn topic_replaces_side_to_move_in_solution_status_not_free_board() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        runner.app_mut().puzzles[0].topic = Some("Мат в один ход\nEndgame".into());
+        let status = format!("{:?}", runner.app().screen().nodes);
+        assert!(status.contains("Мат в один ход"));
+        assert!(!status.contains("White to move"));
+        assert!(!status.contains("Black to move"));
+
+        runner.action(action_id(MODE_TOGGLE));
+        let status = format!("{:?}", runner.app().screen().nodes);
+        assert!(status.contains("Free board"));
+        assert!(!status.contains("Мат в один ход"));
     }
 
     #[test]
     fn completed_puzzles_allow_missing_or_blank_descriptions() {
         for description in [None, Some(String::new()), Some(" \n ".into())] {
             let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
-            runner.app_mut().puzzles[0].description = description;
+            let puzzle = &mut runner.app_mut().puzzles[0];
+            puzzle.description = description.clone();
+            puzzle.description_content = description
+                .into_iter()
+                .map(crate::analysis::ContentSpan::Text)
+                .collect();
             play(&mut runner, "d7e8");
-            runner.action(action_id(DESCRIPTION_TOGGLE));
-            runner.action(action_id(DESCRIPTION_TOGGLE));
             assert!(!runner
                 .app()
                 .screen()
@@ -2596,7 +2579,6 @@ mod tests {
                     ));
                     for action in [
                         MODE_TOGGLE,
-                        DESCRIPTION_TOGGLE,
                         ORIENTATION_LOCK,
                         RESET,
                         FLIP,
