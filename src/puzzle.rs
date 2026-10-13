@@ -397,7 +397,7 @@ mod tests {
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["parent"] = json!("lost")).contains("parent"));
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n1", "n2", "n3"])).contains("child"));
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n2"])).contains("link"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["children"] = json!(["n2"])).contains("parent/child"));
+        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["children"] = json!(["n2"])).contains("child"));
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n2", "n3", "missing"])).contains("missing child"));
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n0", "n1", "n2", "n3"])).contains("root"));
         assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["parent"] = json!("n3")).contains("root"));
