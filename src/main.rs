@@ -2736,17 +2736,6 @@ mod tests {
             .iter()
             .any(|node| { node.kind.acts_on() == Some(action_id(PUZZLE_PICKER_CANCEL)) }));
     }
-}
-
-fn main() -> ExitCode {
-    match kobo_sdk::run("eink-chess", ChessBoardApp::default()) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("eink-chess: {error}");
-            ExitCode::FAILURE
-        }
-    }
-
     // Task 04: the browser is a transient overlay, not another solving mode.
     const RICH_PUZZLES: &[u8] =
         include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json");
@@ -2994,5 +2983,17 @@ fn main() -> ExitCode {
         play(&mut runner, "h1h2");
         assert!(runner.app().current_is_solved());
     }
+
+}
+
+fn main() -> ExitCode {
+    match kobo_sdk::run("eink-chess", ChessBoardApp::default()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("eink-chess: {error}");
+            ExitCode::FAILURE
+        }
+    }
+
 
 }
