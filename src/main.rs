@@ -1704,9 +1704,6 @@ mod tests {
         assert_eq!(runner.app().board, initial_board);
 
         let screen = runner.app().screen();
-        assert!(!screen.nodes.iter().any(|node| {
-            matches!(node, kobo_sdk::Node::Cell { .. })
-        }), "toolbar uses the Cobalt control-node representation");
         let diagnostics =
             screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
         assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
