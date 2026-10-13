@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "revision": 1,
+  "title": "Task 20 rich-analysis contract",
+  "puzzles": [
+    {
+      "id": "rich-black-promotion",
+      "fen": "k7/8/8/8/8/8/7p/K7 b - - 0 1",
+      "description": "Choose the promotion. h1=Q+ in plain prose is not interactive.",
+      "description_content": [
+        {
+          "type": "text",
+          "text": "Choose "
+        },
+        {
+          "type": "move_ref",
+          "node": "missing",
+          "label": "1...h1=Q+"
+        },
+        {
+          "type": "text",
+          "text": " or inspect "
+        },
+        {
+          "type": "move_ref",
+          "node": "n2"
+        },
+        {
+          "type": "text",
+          "text": ". The text h1=N is deliberately plain."
+        }
+      ],
+      "difficulty": "Contract",
+      "solution": [
+        "h2h1q"
+      ],
+      "analysis": {
+        "version": 1,
+        "root": "n0",
+        "nodes": [
+          {
+            "id": "n0",
+            "fen": "k7/8/8/8/8/8/7p/K7 b - - 0 1",
+            "comment": "Black to move; compare all promotion choices.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Main idea: "
+              },
+              {
+                "type": "move_ref",
+                "node": "n1"
+              },
+              {
+                "type": "text",
+                "text": "."
+              }
+            ],
+            "children": [
+              "n1",
+              "n2",
+              "n3"
+            ]
+          },
+          {
+            "id": "n1",
+            "parent": "n0",
+            "move": {
+              "uci": "h2h1q",
+              "san": "h1=Q+"
+            },
+            "fen": "k7/8/8/8/8/8/8/K6q w - - 0 2",
+            "role": "main",
+            "comment": "Best promotion.",
+            "content": [
+              {
+                "type": "text",
+                "text": "The queen promotion wins immediately."
+              }
+            ],
+            "nags": [
+              1
+            ]
+          },
+          {
+            "id": "n2",
+            "parent": "n0",
+            "move": {
+              "uci": "h2h1n",
+              "san": "h1=N"
+            },
+            "fen": "k7/8/8/8/8/8/8/K6n w - - 0 2",
+            "role": "alternative",
+            "comment": "An explicitly marked alternative.",
+            "children": []
+          },
+          {
+            "id": "n3",
+            "parent": "n0",
+            "move": {
+              "uci": "h2h1r",
+              "san": "h1=R+"
+            },
+            "fen": "k7/8/8/8/8/8/8/K6r w - - 0 2"
+          }
+        ]
+      }
+    }
+  ]
+}

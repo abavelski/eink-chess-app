@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "title": "Lichess sample puzzles",
+  "source": "https://database.lichess.org/#puzzles",
+  "license": "CC0-1.0",
+  "puzzles": [
+    {
+      "id": "lichess-001cr",
+      "fen": "8/3B2pp/p5k1/6P1/1ppp1K2/8/1P6/8 w - - 0 39",
+      "description": "Solution begins with d7e8.\nFollow the line one move at a time.\nReplay it to practice the idea.",
+      "solution": ["d7e8"],
+      "source": "https://lichess.org/training/001cr"
+    },
+    {
+      "id": "lichess-000hf",
+      "fen": "r1bq3r/pp1nbkp1/2p1p2p/8/2BP4/1PN3P1/P3QP1P/3R1RK1 w - - 0 20",
+      "description": "Solution begins with e2e6.\nFollow the line one move at a time.\nReplay it to practice the idea.",
+      "solution": ["e2e6", "f7f8", "e6f7"],
+      "source": "https://lichess.org/training/000hf"
+    }
+  ]
+}

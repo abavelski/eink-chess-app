@@ -1,0 +1,145 @@
+{
+  "upstream_repository": "https://github.com/abavelski/kindle-chess-puzzles",
+  "upstream_commit": "80eaf892fe0c7a96e3ba603e25ee3af57e3d93c8",
+  "normative_spec": "https://github.com/abavelski/kindle-chess-puzzles/blob/80eaf892fe0c7a96e3ba603e25ee3af57e3d93c8/docs/PUZZLE_FORMAT.md",
+  "normative_spec_git_blob_sha1": "1076d9a09087b7e0b56b1c8d8fd6e54f0f81dcfa",
+  "raw_file_limit_bytes": 8388608,
+  "legacy_control": {
+    "path": "examples/puzzles.json",
+    "sha256": "0521825d87640c69b5989c16748c6d92189f3d3edb34dd2ab612884314599e88"
+  },
+  "fixtures": [
+    {
+      "path": "pgn-converter/valid-book.json",
+      "upstream_path": "tests/fixtures/pgn-converter/valid-book.json",
+      "bytes": 10466,
+      "sha256": "85f0e22c95deb99baedf37f192d14d06afaebd5f2b29ec224973f5ea6deed2aa",
+      "git_blob_sha1": "9612d1757774480e7fee1ed9d8e9951c8d15c7a7",
+      "expected": "valid"
+    },
+    {
+      "path": "puzzles.json",
+      "upstream_path": "tests/fixtures/puzzles.json",
+      "bytes": 794,
+      "sha256": "95d9f37c13f9df9ce686a75bee0288c2c54c1f84e53d292a619de4a53e95a9bf",
+      "git_blob_sha1": "ef2719fa9a7d65927396ad0b212d716982a7c63b",
+      "expected": "valid"
+    },
+    {
+      "path": "rich-analysis/invalid-cycle.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-cycle.json",
+      "bytes": 2453,
+      "sha256": "81f4ea93ab8febbaf87df0d672a456557a4034ea0c18410844ac225538f81249",
+      "git_blob_sha1": "3eddcfa95e680454c06ba026966ce513c9b9b979",
+      "expected": "invalid",
+      "invariant": "cycle in ordered child graph"
+    },
+    {
+      "path": "rich-analysis/invalid-disconnected.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-disconnected.json",
+      "bytes": 2604,
+      "sha256": "b2fd8023596b1b06904c4719ba23d4bf5afd64b8a701dfd46934f66248ed7934",
+      "git_blob_sha1": "29bfcea49716644987b10f42cf6a9f2ee248f48c",
+      "expected": "invalid",
+      "invariant": "node unreachable from root"
+    },
+    {
+      "path": "rich-analysis/invalid-duplicate-id.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-duplicate-id.json",
+      "bytes": 3138,
+      "sha256": "335a1b8515810dc49397da444aa3eb86360bb1e3abf1b9c7c4213a55b00a29fb",
+      "git_blob_sha1": "ac441ccc048b3c14b279f1b3ae0f9fe61878f6c8",
+      "expected": "invalid",
+      "invariant": "duplicate analysis node ID"
+    },
+    {
+      "path": "rich-analysis/invalid-main-solution-mismatch.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-main-solution-mismatch.json",
+      "bytes": 2624,
+      "sha256": "05679ef253c15d620b25afeee65d5186ca9e08c74be0dcaa32674f35cd0415ee",
+      "git_blob_sha1": "47ffe51f8dd1e7d2ba4e69217903bbcef79b1356",
+      "expected": "invalid",
+      "invariant": "projected main UCI path differs from legacy solution"
+    },
+    {
+      "path": "rich-analysis/invalid-missing-child.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-missing-child.json",
+      "bytes": 2649,
+      "sha256": "adce45a045716189b2d0390b7fcef8fbedddba16c81ca7486ddf58a8aff70c32",
+      "git_blob_sha1": "33c4c37012584bf148b4885772c662ba5c8d4b8e",
+      "expected": "invalid",
+      "invariant": "child references a nonexistent node"
+    },
+    {
+      "path": "rich-analysis/invalid-move-ref-dangling.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-move-ref-dangling.json",
+      "bytes": 2629,
+      "sha256": "c7b570a4860a3bff85ffbe017aff8b6597b883a321feaa32c7dea9ca11446639",
+      "git_blob_sha1": "516ede70f63b10535774cedd75a41b0cc3407fc4",
+      "expected": "invalid",
+      "invariant": "move_ref references a nonexistent node"
+    },
+    {
+      "path": "rich-analysis/invalid-move-ref-root.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-move-ref-root.json",
+      "bytes": 2624,
+      "sha256": "889e223b229776c10dd7ed1a0ef92bc2834953b09c4a23b736c0cf82c3205d0e",
+      "git_blob_sha1": "3065ba071852e919ae45f7a67303c27445feea89",
+      "expected": "invalid",
+      "invariant": "move_ref targets root instead of a move"
+    },
+    {
+      "path": "rich-analysis/invalid-root-fen-mismatch.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-root-fen-mismatch.json",
+      "bytes": 2624,
+      "sha256": "4994061d91ca34ab1a8339eb9607903de324cd11d4993089a0d77b88a841d0cf",
+      "git_blob_sha1": "ae755ebfb17f78c10ead1df11223b82ca3d0ba96",
+      "expected": "invalid",
+      "invariant": "root node FEN differs from puzzle FEN"
+    },
+    {
+      "path": "rich-analysis/invalid-span-bad-label.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-span-bad-label.json",
+      "bytes": 2614,
+      "sha256": "e632463db5d09220c072162b64063500dd5982916747a84a2104c16d2c817bfc",
+      "git_blob_sha1": "3314cac363086d37a7167e0e36378452b5adf825",
+      "expected": "invalid",
+      "invariant": "move_ref label has wrong JSON type"
+    },
+    {
+      "path": "rich-analysis/invalid-span-missing-text.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-span-missing-text.json",
+      "bytes": 2595,
+      "sha256": "f7653abe59be10ab48067916cd8e4e7a49a2872ebcc69c47d991d976f2e309ad",
+      "git_blob_sha1": "7c22d2aef12df9c862a3fb76888a0647f7a476ef",
+      "expected": "invalid",
+      "invariant": "text span is missing required nonempty text"
+    },
+    {
+      "path": "rich-analysis/invalid-span-unknown-type.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-span-unknown-type.json",
+      "bytes": 2630,
+      "sha256": "597cefd88986e98de1daba56bc0c191e9e051ffcb77291438ab6be7db6dcca9b",
+      "git_blob_sha1": "2adb2ef3f418216046ca9b2245635473cc17789d",
+      "expected": "invalid",
+      "invariant": "span has unrecognized type"
+    },
+    {
+      "path": "rich-analysis/invalid-uci.json",
+      "upstream_path": "tests/fixtures/rich-analysis/invalid-uci.json",
+      "bytes": 2624,
+      "sha256": "a697b5d26698b0deb95dfffd05a86a9075a78ec596d7d537157af76f2b09b696",
+      "git_blob_sha1": "5836ee58a8a9662d65fe6ee2d1e127c77cfb3e57",
+      "expected": "invalid",
+      "invariant": "node has invalid UCI move"
+    },
+    {
+      "path": "rich-analysis/valid-rich.json",
+      "upstream_path": "tests/fixtures/rich-analysis/valid-rich.json",
+      "bytes": 2624,
+      "sha256": "972a046bd49a9022ea491bc16ad74b27992af473555dac59b94acd9cb7eb0aed",
+      "git_blob_sha1": "c30433d83cca34d47acb8ab04569f5ea81ac10d5",
+      "expected": "valid"
+    }
+  ]
+}

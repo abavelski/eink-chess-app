@@ -1,0 +1,419 @@
+{
+  "version": 1,
+  "puzzles": [
+    {
+      "id": "nested-001",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "description": "Compare the main knight with c5 and plain Nd5/e2e4.",
+      "description_content": [
+        {
+          "type": "text",
+          "text": "Compare "
+        },
+        {
+          "type": "move_ref",
+          "node": "n7",
+          "label": "the main knight"
+        },
+        {
+          "type": "text",
+          "text": " with "
+        },
+        {
+          "type": "move_ref",
+          "node": "n3"
+        },
+        {
+          "type": "text",
+          "text": " and plain Nd5/e2e4."
+        }
+      ],
+      "difficulty": "3",
+      "source": "fixture:nested",
+      "solution": [
+        "e2e4",
+        "e7e5",
+        "g1f3",
+        "b8c6"
+      ],
+      "analysis": {
+        "version": 1,
+        "root": "n0",
+        "nodes": [
+          {
+            "id": "n0",
+            "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "children": [
+              "n1"
+            ]
+          },
+          {
+            "id": "n1",
+            "parent": "n0",
+            "move": {
+              "uci": "e2e4",
+              "san": "e4"
+            },
+            "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "role": "main",
+            "nags": [
+              1
+            ],
+            "children": [
+              "n2",
+              "n3"
+            ],
+            "comment": "Central move. Compare 1...e5 with e2e4 in plain text.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Central move. Compare "
+              },
+              {
+                "type": "move_ref",
+                "node": "n2",
+                "label": "1...e5"
+              },
+              {
+                "type": "text",
+                "text": " with e2e4 in plain text."
+              }
+            ]
+          },
+          {
+            "id": "n2",
+            "parent": "n1",
+            "move": {
+              "uci": "e7e5",
+              "san": "e5"
+            },
+            "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+            "role": "main",
+            "children": [
+              "n7"
+            ]
+          },
+          {
+            "id": "n3",
+            "parent": "n1",
+            "move": {
+              "uci": "c7c5",
+              "san": "c5"
+            },
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2",
+            "role": "alternative",
+            "children": [
+              "n4"
+            ],
+            "comment": "Sicilian alternative.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Sicilian alternative."
+              }
+            ]
+          },
+          {
+            "id": "n4",
+            "parent": "n3",
+            "move": {
+              "uci": "g1f3",
+              "san": "Nf3"
+            },
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+            "role": "sideline",
+            "children": [
+              "n5",
+              "n6"
+            ]
+          },
+          {
+            "id": "n5",
+            "parent": "n4",
+            "move": {
+              "uci": "b8c6",
+              "san": "Nc6"
+            },
+            "fen": "r1bqkbnr/pp1ppppp/2n5/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+            "role": "sideline"
+          },
+          {
+            "id": "n6",
+            "parent": "n4",
+            "move": {
+              "uci": "d7d6",
+              "san": "d6"
+            },
+            "fen": "rnbqkbnr/pp2pppp/3p4/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3",
+            "role": "sideline",
+            "comment": "Nested sideline.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Nested sideline."
+              }
+            ]
+          },
+          {
+            "id": "n7",
+            "parent": "n2",
+            "move": {
+              "uci": "g1f3",
+              "san": "Nf3"
+            },
+            "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+            "role": "main",
+            "children": [
+              "n8"
+            ]
+          },
+          {
+            "id": "n8",
+            "parent": "n7",
+            "move": {
+              "uci": "b8c6",
+              "san": "Nc6"
+            },
+            "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+            "role": "main"
+          }
+        ]
+      }
+    },
+    {
+      "id": "promotion-black-001",
+      "fen": "8/8/8/8/8/6k1/7p/K7 b - - 0 1",
+      "description": "Promote with 1...h1=Q+ or inspect h1=N.",
+      "description_content": [
+        {
+          "type": "text",
+          "text": "Promote with "
+        },
+        {
+          "type": "move_ref",
+          "node": "n1",
+          "label": "1...h1=Q+"
+        },
+        {
+          "type": "text",
+          "text": " or inspect "
+        },
+        {
+          "type": "move_ref",
+          "node": "n2"
+        },
+        {
+          "type": "text",
+          "text": "."
+        }
+      ],
+      "solution": [
+        "h2h1q",
+        "a1a2"
+      ],
+      "analysis": {
+        "version": 1,
+        "root": "n0",
+        "nodes": [
+          {
+            "id": "n0",
+            "fen": "8/8/8/8/8/6k1/7p/K7 b - - 0 1",
+            "children": [
+              "n1",
+              "n2"
+            ]
+          },
+          {
+            "id": "n1",
+            "parent": "n0",
+            "move": {
+              "uci": "h2h1q",
+              "san": "h1=Q+"
+            },
+            "fen": "8/8/8/8/8/6k1/8/K6q w - - 0 2",
+            "role": "main",
+            "children": [
+              "n3"
+            ],
+            "comment": "Promotion comment with plain h1=Q+.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Promotion comment with plain h1=Q+."
+              }
+            ]
+          },
+          {
+            "id": "n2",
+            "parent": "n0",
+            "move": {
+              "uci": "h2h1n",
+              "san": "h1=N"
+            },
+            "fen": "8/8/8/8/8/6k1/8/K6n w - - 0 2",
+            "role": "sideline",
+            "comment": "Underpromotion sideline.",
+            "content": [
+              {
+                "type": "text",
+                "text": "Underpromotion sideline."
+              }
+            ]
+          },
+          {
+            "id": "n3",
+            "parent": "n1",
+            "move": {
+              "uci": "a1a2",
+              "san": "Ka2"
+            },
+            "fen": "8/8/8/8/8/6k1/K7/7q b - - 1 2",
+            "role": "main"
+          }
+        ]
+      }
+    },
+    {
+      "id": "castle-capture-001",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "solution": [
+        "e2e4",
+        "e7e5",
+        "g1f3",
+        "b8c6",
+        "f1b5",
+        "a7a6",
+        "b5c6",
+        "d7c6",
+        "e1g1"
+      ],
+      "analysis": {
+        "version": 1,
+        "root": "n0",
+        "nodes": [
+          {
+            "id": "n0",
+            "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "children": [
+              "n1"
+            ]
+          },
+          {
+            "id": "n1",
+            "parent": "n0",
+            "move": {
+              "uci": "e2e4",
+              "san": "e4"
+            },
+            "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+            "role": "main",
+            "children": [
+              "n2"
+            ]
+          },
+          {
+            "id": "n2",
+            "parent": "n1",
+            "move": {
+              "uci": "e7e5",
+              "san": "e5"
+            },
+            "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+            "role": "main",
+            "children": [
+              "n3"
+            ]
+          },
+          {
+            "id": "n3",
+            "parent": "n2",
+            "move": {
+              "uci": "g1f3",
+              "san": "Nf3"
+            },
+            "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+            "role": "main",
+            "children": [
+              "n4"
+            ]
+          },
+          {
+            "id": "n4",
+            "parent": "n3",
+            "move": {
+              "uci": "b8c6",
+              "san": "Nc6"
+            },
+            "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+            "role": "main",
+            "children": [
+              "n5"
+            ]
+          },
+          {
+            "id": "n5",
+            "parent": "n4",
+            "move": {
+              "uci": "f1b5",
+              "san": "Bb5"
+            },
+            "fen": "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+            "role": "main",
+            "children": [
+              "n6"
+            ]
+          },
+          {
+            "id": "n6",
+            "parent": "n5",
+            "move": {
+              "uci": "a7a6",
+              "san": "a6"
+            },
+            "fen": "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4",
+            "role": "main",
+            "children": [
+              "n7"
+            ]
+          },
+          {
+            "id": "n7",
+            "parent": "n6",
+            "move": {
+              "uci": "b5c6",
+              "san": "Bxc6"
+            },
+            "fen": "r1bqkbnr/1ppp1ppp/p1B5/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4",
+            "role": "main",
+            "children": [
+              "n8"
+            ]
+          },
+          {
+            "id": "n8",
+            "parent": "n7",
+            "move": {
+              "uci": "d7c6",
+              "san": "dxc6"
+            },
+            "fen": "r1bqkbnr/1pp2ppp/p1p5/4p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 5",
+            "role": "main",
+            "children": [
+              "n9"
+            ]
+          },
+          {
+            "id": "n9",
+            "parent": "n8",
+            "move": {
+              "uci": "e1g1",
+              "san": "O-O"
+            },
+            "fen": "r1bqkbnr/1pp2ppp/p1p5/4p3/4P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 5",
+            "role": "main"
+          }
+        ]
+      }
+    }
+  ]
+}
