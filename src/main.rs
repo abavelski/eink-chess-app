@@ -1444,6 +1444,113 @@ mod tests {
         }
     }
 
+    fn select_with_range_reply(
+        runner: &mut AppRunner<ChessBoardApp>,
+        key: &str,
+        data: &[u8],
+        response_error: Option<kobo_sdk::StoreError>,
+    ) -> Vec<Command> {
+        let index = runner.app().collections.iter().position(|entry| entry.key == key).unwrap();
+        runner.action(action_id(PUZZLE_PICKER));
+        let commands = runner.action(action_id(&collection_action(index)));
+        assert!(commands.iter().any(|command| matches!(command,
+            Command::Store(StoreRequest::Load { key: name }) if name == key)));
+        let mut pending = runner.store_result(StoreResult::Denied(kobo_sdk::StoreError::TooFull));
+        let mut seen = 0;
+        let mut issued = Vec::new();
+        while !pending.is_empty() {
+            let mut next = Vec::new();
+            for command in pending {
+                if let Command::Store(StoreRequest::ShelfRead { name, offset, length }) = &command {
+                    seen += 1;
+                    assert!(seen <= 258, "two passes of 8 MiB at 64 KiB each");
+                    assert_eq!(name, &format!("{}{}", large_collection::READ_PREFIX, key));
+                    assert!(*length as usize <= large_collection::READ_CHUNK);
+                    let answer = match response_error {
+                        Some(error) => StoreResult::Denied(error),
+                        None => {
+                            let from = *offset as usize;
+                            let end = (from + *length as usize).min(data.len());
+                            StoreResult::ShelfRead {
+                                name: name.clone(),
+                                offset: *offset,
+                                bytes: data[from..end].to_vec(),
+                                size: data.len() as u32,
+                            }
+                        }
+                    };
+                    next.extend(runner.store_result(answer));
+                }
+                issued.push(command);
+            }
+            pending = next;
+        }
+        assert!(seen > 0, "large file uses range transport");
+        issued
+    }
+
+    #[test]
+    fn selected_large_collection_is_fully_validated_before_atomic_activation() {
+        let collection = serde_json::json!({
+            "version": 1, "title": "Large book",
+            "puzzles": [{
+                "id": "large-1",
+                "fen": "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+                "description": "x".repeat(1024 * 1024),
+                "solution": ["g6g7"]
+            }]
+        });
+        let bytes = serde_json::to_vec(&collection).unwrap();
+        assert!(bytes.len() > 256 * 1024);
+        let key = "puzzles-large.json";
+        let (mut runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+            (key, ALT_PUZZLES.to_vec()),
+        ]);
+        let commands = select_with_range_reply(&mut runner, key, &bytes, None);
+        assert_eq!(runner.app().active_collection.as_deref(), Some(key));
+        assert_eq!(runner.app().puzzles[0].id, "large-1");
+        assert!(commands.iter().any(|command| matches!(command,
+            Command::Store(StoreRequest::Save { key, .. }) if key == PROGRESS_KEY)));
+    }
+
+    #[test]
+    fn failed_large_selection_never_changes_board_file_or_progress() {
+        let key = "puzzles-large.json";
+        for payload in [
+            vec![0xff; 256 * 1024 + 1],
+            vec![b'{'; 256 * 1024 + 1],
+        ] {
+            let (mut runner, _) = runner_with_collections(vec![
+                (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+                (key, ALT_PUZZLES.to_vec()),
+            ]);
+            let old_board = runner.app().board.clone();
+            let old_progress = runner.app().progress.clone();
+            let commands = select_with_range_reply(&mut runner, key, &payload, None);
+            assert_eq!(runner.app().board, old_board);
+            assert_eq!(runner.app().progress, old_progress);
+            assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+            assert!(runner.app().file_error.as_deref().unwrap().contains(key));
+            assert!(!commands.iter().any(|command| matches!(command,
+                Command::Store(StoreRequest::Save { key, .. }) if key == PROGRESS_KEY)));
+        }
+
+        let (mut runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, EXAMPLE_PUZZLES.to_vec()),
+            (key, ALT_PUZZLES.to_vec()),
+        ]);
+        let old_board = runner.app().board.clone();
+        let old_progress = runner.app().progress.clone();
+        select_with_range_reply(
+            &mut runner, key, ALT_PUZZLES, Some(kobo_sdk::StoreError::Missing)
+        );
+        assert_eq!(runner.app().board, old_board);
+        assert_eq!(runner.app().progress, old_progress);
+        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert!(runner.app().file_error.as_deref().unwrap().contains("runtime lacks"));
+    }
+
     #[test]
     fn flipped_display_reverses_board_but_not_uci_coordinates() {
         assert_eq!(board_square(0, false), 0);
