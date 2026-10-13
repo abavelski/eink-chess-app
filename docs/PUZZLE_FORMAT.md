@@ -14,8 +14,13 @@ are ignored by the collection picker.
 
 Close E-Ink Chess, connect the Kobo by USB, and copy or edit the files. Eject
 the reader before disconnecting, then reopen the app. No rebuild is needed.
-Each file must be no larger than 256 KiB (Cobalt's store limit). Use ordinary
-JSON without comments or trailing commas.
+Each file may be up to **8 MiB (8,388,608 raw UTF-8 bytes)**, including the
+limit itself. Larger books must be split into separate unchanged collections.
+Small files still use Cobalt's 256 KiB state store; larger files require the
+read-only range adapter installed with `scripts/prepare_cobalt.py` and rebuilt
+in kobod (see [large collection setup](KINDLE_LARGE_COLLECTION_LOADING.md)).
+Unpatched runtimes cannot load files above 256 KiB. Use ordinary JSON without
+comments or trailing commas.
 
 ## Example
 
