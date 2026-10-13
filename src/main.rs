@@ -208,7 +208,6 @@ impl ChessBoardApp {
 
     fn request_collection(&mut self, context: &mut Context, key: String) {
         self.picker_open = false;
-        self.remember_current_puzzle();
         if self.active_collection.as_deref() == Some(key.as_str()) {
             self.show(context);
             return;
@@ -268,6 +267,7 @@ impl ChessBoardApp {
             },
             CollectionLoadKind::Selection => match parsed {
                 Ok(collection) => {
+                    self.remember_current_puzzle();
                     let title = collection.title.clone();
                     if let Some(entry) = self.collections.iter_mut().find(|entry| entry.key == key)
                     {
