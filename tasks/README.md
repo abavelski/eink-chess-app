@@ -10,9 +10,9 @@ These tasks turn the ideas in [docs/NEXT_STEPS.md](../docs/NEXT_STEPS.md) into i
 4. [04-multiple-puzzle-files.md](04-multiple-puzzle-files.md) — discover and switch between several puzzle collections.
 5. [05-persist-progress.md](05-persist-progress.md) — remember solved puzzles, active file, and current puzzle.
 6. [06-unsolved-only-navigation.md](06-unsolved-only-navigation.md) — optionally browse only puzzles that are not solved.
-7. [07-rich-solutions.md](07-rich-solutions.md) — add descriptions and multiple valid solution lines with a backward-compatible format.
+7. **Superseded:** [07-rich-solutions.md](07-rich-solutions.md) proposed root-v2 multiple grading lines; do not implement it. For actual Kindle-format parity use [kindle-puzzle-parity task list](kindle-puzzle-parity/README.md).
 
-Tasks 1–3 are intentionally small enough to land independently. Tasks 4–6 build the collection/progress workflow. Task 7 is intentionally larger and should come after the basic solving state machine is stable.
+Tasks 1–3 are intentionally small enough to land independently. Tasks 4–6 build the collection/progress workflow. The old Task 7 is superseded by Kindle's additive root-v1 rich-analysis contract. The [Kobo/Kindle parity plan](../docs/KINDLE_PUZZLE_PARITY_PLAN.md) provides independent, host-tested implementation tasks (00–09), with physical acceptance last.
 
 ## Common definition of done
 

@@ -1,3 +1,5 @@
+> **SUPERSEDED — DO NOT IMPLEMENT.** This historical task's root `version: 2` `solutions` proposal is incompatible with current Kindle puzzle JSON and would change grading behavior. Implement [Kobo/Kindle parity tasks](kindle-puzzle-parity/README.md) instead, preserving root `version: 1` + optional `analysis.version: 1` and strict legacy `solution` grading.
+
 # Task 07 — Rich solution descriptions and alternative lines
 
 **Status:** Ready  
