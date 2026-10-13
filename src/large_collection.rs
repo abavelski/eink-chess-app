@@ -188,6 +188,8 @@ mod tests {
     }
 
     impl KoboApp for Probe {
+        fn on_action(&mut self, _context: &mut Context, _action: kobo_sdk::ActionId) {}
+
         fn on_start(&mut self, context: &mut Context) {
             self.read = Some(CollectionReader::begin(context, "puzzles.json", self.mode).unwrap());
         }
@@ -247,7 +249,7 @@ mod tests {
 
     #[test]
     fn all_boundaries_are_byte_exact_with_fixed_size_requests() {
-        for size in [256 * 1024, 256 * 1024 + 1, 1024 * 1024,
+        for size in [256_usize * 1024, 256 * 1024 + 1, 1024 * 1024,
             3 * 1024 * 1024, 5 * 1024 * 1024, 8 * 1024 * 1024]
         {
             let original = (0..size).map(|i| (i.wrapping_mul(37) % 251) as u8).collect::<Vec<_>>();
