@@ -21,8 +21,16 @@ METHOD = '''
         let Some(root) = self.root.as_ref() else {
             return Some(StoreResult::Denied(StoreError::Unwritable));
         };
-        let Ok(mut file) = fs::File::open(root.join(filename)) else {
+        let path = root.join(filename);
+        // Never follow a symlink outside the application's state directory.
+        let Ok(link_info) = fs::symlink_metadata(&path) else {
             return Some(StoreResult::Denied(StoreError::Missing));
+        };
+        if !link_info.file_type().is_file() {
+            return Some(StoreResult::Denied(StoreError::Unwritable));
+        }
+        let Ok(mut file) = fs::File::open(&path) else {
+            return Some(StoreResult::Denied(StoreError::Unwritable));
         };
         let Ok(before) = file.metadata() else {
             return Some(StoreResult::Denied(StoreError::Unwritable));
