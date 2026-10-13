@@ -1,10 +1,13 @@
 mod analysis;
+mod analysis_browser;
 mod board;
 mod large_collection;
 mod presentation;
 mod progress;
 mod puzzle;
 
+use analysis::NodeHandle;
+use analysis_browser::AnalysisBrowser;
 use board::{Board, Color, Piece, PieceKind, TapResult};
 use kobo_sdk::{
     action_id, ActionId, BandAlign, BannerLevel, Context, Glyph, KoboApp, Screen, ScreenBuilder,
@@ -24,6 +27,8 @@ const EXIT: &str = "exit";
 const MODE_TOGGLE: &str = "mode-toggle";
 const ORIENTATION_LOCK: &str = "orientation-lock";
 const PUZZLE_PICKER: &str = "puzzle-picker";
+// The visible reader control and paginated actions are added in Task 06.
+const ANALYSIS_TOGGLE: &str = "analysis-toggle";
 const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
 const COLLECTION_ACTION_PREFIX: &str = "collection-";
 const PROMOTE_QUEEN: &str = "promote-queen";
@@ -93,6 +98,7 @@ struct ChessBoardApp {
     solution_feedback: Option<SolutionFeedback>,
     mode: BoardMode,
     pending_promotion: Option<PendingPromotion>,
+    analysis_browser: AnalysisBrowser,
     collections: Vec<CollectionEntry>,
     active_collection: Option<String>,
     collection_load: Option<CollectionLoad>,
@@ -209,6 +215,7 @@ impl ChessBoardApp {
     }
 
     fn request_collection(&mut self, context: &mut Context, key: String) {
+        self.analysis_browser.close();
         self.picker_open = false;
         if self.active_collection.as_deref() == Some(key.as_str()) {
             self.show(context);
@@ -334,6 +341,7 @@ impl ChessBoardApp {
     }
 
     fn select_puzzle(&mut self, index: usize) {
+        self.analysis_browser.close();
         let puzzle = &self.puzzles[index];
         self.board = Board::from_fen(&puzzle.fen).expect("validated puzzle FEN");
         if !self.orientation_locked {
@@ -348,6 +356,55 @@ impl ChessBoardApp {
         self.solution_ply = 0;
         self.solution_feedback = None;
         self.pending_promotion = None;
+    }
+
+    /// Accessed by the future Kobo Analysis UI and by host-only state tests.
+    /// The reader never owns or changes the solving board.
+    fn open_analysis(&mut self) -> bool {
+        if self.mode != BoardMode::Solution
+            || self.pending_promotion.is_some()
+            || self.picker_open
+            || self.sleeping
+            || self.collection_load.is_some()
+        {
+            return false;
+        }
+        self.puzzles
+            .get(self.puzzle_index)
+            .is_some_and(|puzzle| self.analysis_browser.open(puzzle))
+    }
+
+    fn close_analysis(&mut self) -> bool {
+        self.analysis_browser.close()
+    }
+
+    fn select_analysis_node(&mut self, node: NodeHandle) -> bool {
+        if self.pending_promotion.is_some()
+            || self.picker_open
+            || self.sleeping
+            || self.mode != BoardMode::Solution
+        {
+            return false;
+        }
+        let tree = self
+            .puzzles
+            .get(self.puzzle_index)
+            .and_then(|puzzle| puzzle.analysis.as_ref());
+        self.analysis_browser.select(tree, node)
+    }
+
+    /// The page count is supplied by the future text projection/paginator.
+    fn turn_analysis_page(&mut self, forward: bool, page_count: usize) -> bool {
+        if self.pending_promotion.is_some() || self.picker_open || self.sleeping {
+            return false;
+        }
+        self.analysis_browser.turn_page(forward, page_count)
+    }
+
+    fn displayed_board(&self) -> &Board {
+        self.analysis_browser
+            .preview_board()
+            .unwrap_or(&self.board)
     }
 
     fn note_progress_change(&mut self) {
@@ -501,7 +558,8 @@ impl ChessBoardApp {
     }
 
     fn screen(&self) -> Screen {
-        let selected = self.board.selected();
+        let displayed_board = self.displayed_board();
+        let selected = displayed_board.selected();
         let feedback_glyph = if self.mode == BoardMode::Solution {
             match self.solution_feedback {
                 Some(SolutionFeedback::Complete) => Some(Glyph::ThumbUp),
@@ -514,7 +572,7 @@ impl ChessBoardApp {
 
         let cells = (0..CELLS).map(|display_square| {
             let square = board_square(display_square, self.flipped);
-            let piece = self.board.piece_at(square);
+            let piece = displayed_board.piece_at(square);
             (
                 square_action(square),
                 square_label(square, piece),
@@ -660,6 +718,9 @@ impl ChessBoardApp {
     }
 
     fn handle_square_tap(&mut self, square: usize) -> bool {
+        if self.analysis_browser.is_open() {
+            return false;
+        }
         if (self.mode == BoardMode::Solution
             && self.solution_feedback == Some(SolutionFeedback::Complete))
             || self.pending_promotion.is_some()
@@ -710,6 +771,7 @@ impl ChessBoardApp {
             return;
         }
 
+        self.analysis_browser.close();
         self.pending_promotion = None;
         self.description_visible = false;
         self.board.clear_selection();
@@ -950,8 +1012,17 @@ impl KoboApp for ChessBoardApp {
             return;
         }
 
+        if action == action_id(ANALYSIS_TOGGLE) {
+            if !self.close_analysis() {
+                self.open_analysis();
+            }
+            self.show(context);
+            return;
+        }
+
         if action == action_id(PUZZLE_PICKER) {
             if self.collection_load.is_none() && !self.collections.is_empty() {
+                self.analysis_browser.close();
                 self.picker_open = true;
                 self.show(context);
             }
@@ -979,6 +1050,7 @@ impl KoboApp for ChessBoardApp {
         }
 
         if action == action_id(RESET) {
+            self.analysis_browser.close();
             self.board.reset();
             self.reset_attempt();
             self.show(context);
@@ -1004,18 +1076,29 @@ impl KoboApp for ChessBoardApp {
     }
 
     fn on_page_turn(&mut self, context: &mut Context, forward: bool) {
-        if self.pending_promotion.is_none() {
+        if self.pending_promotion.is_some() || self.picker_open {
+            return;
+        }
+        if self.analysis_browser.is_open() {
+            // Task 06 provides the real page count from its text paginator.
+            // Until then page-turn cannot accidentally navigate to another puzzle.
+            if self.turn_analysis_page(forward, 1) {
+                self.show(context);
+            }
+        } else {
             self.turn_puzzle(context, forward);
         }
     }
 
     fn on_suspend(&mut self, context: &mut Context) {
+        self.analysis_browser.close();
         self.save_progress(context);
         self.sleeping = true;
         self.show(context);
     }
 
     fn on_background(&mut self, context: &mut Context) {
+        self.analysis_browser.close();
         self.save_progress(context);
     }
 
@@ -2663,4 +2746,253 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+
+    // Task 04: the browser is a transient overlay, not another solving mode.
+    const RICH_PUZZLES: &[u8] =
+        include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json");
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct AttemptSnapshot {
+        board: Board,
+        solution_ply: usize,
+        feedback: Option<SolutionFeedback>,
+        pending_promotion: Option<PendingPromotion>,
+        description_visible: bool,
+        progress_bytes: Vec<u8>,
+        progress_dirty: bool,
+        progress_generation: u64,
+        progress_saving: Option<u64>,
+        solved: bool,
+    }
+
+    fn attempt_snapshot(app: &ChessBoardApp) -> AttemptSnapshot {
+        AttemptSnapshot {
+            board: app.board.clone(),
+            solution_ply: app.solution_ply,
+            feedback: app.solution_feedback,
+            pending_promotion: app.pending_promotion.clone(),
+            description_visible: app.description_visible,
+            progress_bytes: app.progress.to_bytes().unwrap(),
+            progress_dirty: app.progress_dirty,
+            progress_generation: app.progress_generation,
+            progress_saving: app.progress_saving,
+            solved: app.current_is_solved(),
+        }
+    }
+
+    fn assert_no_progress_write(commands: &[Command]) {
+        assert!(!commands.iter().any(|command| matches!(
+            command,
+            Command::Store(StoreRequest::Save { key, .. }) if key == PROGRESS_KEY
+        )));
+    }
+
+    fn rich_with_continuation() -> Vec<u8> {
+        use serde_json::json;
+        let mut value: serde_json::Value = serde_json::from_slice(RICH_PUZZLES).unwrap();
+        value["puzzles"][0]["solution"] = json!(["h2h1q", "a1a2", "h1h2"]);
+        value["puzzles"][0]["analysis"]["nodes"][1]["children"] = json!(["n4"]);
+        let nodes = value["puzzles"][0]["analysis"]["nodes"]
+            .as_array_mut()
+            .unwrap();
+        nodes.push(json!({
+            "id": "n4", "parent": "n1",
+            "move": {"uci": "a1a2", "san": "Ka2"}, "role": "main",
+            "fen": "k7/8/8/8/8/8/K7/7q b - - 1 2",
+            "children": ["n5"]
+        }));
+        nodes.push(json!({
+            "id": "n5", "parent": "n4",
+            "move": {"uci": "h1h2", "san": "Qh2"}, "role": "main",
+            "fen": "k7/8/8/8/8/8/K6q/8 w - - 2 3"
+        }));
+        serde_json::to_vec(&value).unwrap()
+    }
+
+    #[test]
+    fn preview_after_first_correct_move_keeps_attempt_and_progress_byte_identical() {
+        let (mut runner, _) = runner(Some(rich_with_continuation()));
+        assert_no_progress_write(&play(&mut runner, "h2h1q"));
+        assert_eq!(runner.app().solution_ply, 2);
+        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Correct));
+        let before = attempt_snapshot(runner.app());
+        let node = runner.app().puzzles[0]
+            .analysis.as_ref().unwrap().by_id("n2").unwrap();
+        let alternative_fen = runner.app().puzzles[0]
+            .analysis.as_ref().unwrap().node(node).unwrap().fen().to_owned();
+
+        assert!(runner.app_mut().open_analysis());
+        assert_eq!(runner.app().displayed_board(), &before.board);
+        assert!(runner.app_mut().select_analysis_node(node));
+        assert_eq!(runner.app().analysis_browser.preview_fen(), Some(alternative_fen.as_str()));
+        assert_eq!(
+            runner.app().displayed_board(),
+            &Board::from_fen(&alternative_fen).unwrap()
+        );
+        assert_ne!(runner.app().displayed_board(), &runner.app().board);
+
+        let h1 = square_from_name("h1").unwrap();
+        assert_no_progress_write(&runner.action(action_id(&square_action(h1))));
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert_no_progress_write(&runner.action(action_id(FLIP)));
+        assert_no_progress_write(&runner.action(action_id(ORIENTATION_LOCK)));
+        assert!(runner.app().flipped == false); // started black-facing
+        assert!(runner.app().orientation_locked);
+        assert_eq!(
+            runner.app().displayed_board(),
+            &Board::from_fen(&alternative_fen).unwrap()
+        );
+        assert!(runner.app_mut().turn_analysis_page(true, 3));
+        assert!(runner.app_mut().turn_analysis_page(true, 3));
+        assert!(!runner.app_mut().turn_analysis_page(true, 3));
+        assert_eq!(runner.app().analysis_browser.page(), 2);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        assert!(!runner.app().analysis_browser.is_open());
+        assert_eq!(runner.app().displayed_board(), &before.board);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+
+        let commands = play(&mut runner, "h1h2");
+        assert_eq!(runner.app().solution_ply, 3);
+        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Complete));
+        assert!(runner.app().current_is_solved());
+        assert!(progress_bytes(&commands).is_some(), "only actual solution completion saves");
+    }
+
+    #[test]
+    fn browsing_promotion_alternatives_and_sidelines_never_grades_them() {
+        let (mut runner, _) = runner(Some(RICH_PUZZLES.to_vec()));
+        let before = attempt_snapshot(runner.app());
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        assert!(runner.app().analysis_browser.is_open());
+
+        for (id, kind) in [("n2", PieceKind::Knight), ("n3", PieceKind::Rook)] {
+            let node = runner.app().puzzles[0]
+                .analysis.as_ref().unwrap().by_id(id).unwrap();
+            assert!(runner.app_mut().select_analysis_node(node));
+            assert_eq!(
+                runner.app().displayed_board().piece_at(square_from_name("h1").unwrap()),
+                Some(Piece { color: Color::Black, kind })
+            );
+            assert_eq!(attempt_snapshot(runner.app()), before);
+        }
+        let root = runner.app().puzzles[0].analysis.as_ref().unwrap().root();
+        assert!(runner.app_mut().select_analysis_node(root));
+        assert_eq!(runner.app().displayed_board(), &before.board);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert!(runner.app_mut().close_analysis());
+        assert_eq!(attempt_snapshot(runner.app()), before);
+
+        assert_no_progress_write(&play(&mut runner, "h2h1n"));
+        assert_eq!(runner.app().solution_ply, 0);
+        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Wrong));
+        assert!(!runner.app().current_is_solved());
+        assert_eq!(runner.app().progress.to_bytes().unwrap(), before.progress_bytes);
+        assert_eq!(runner.app().progress_generation, before.progress_generation);
+        let commands = play(&mut runner, "h2h1q");
+        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Complete));
+        assert!(runner.app().current_is_solved());
+        assert!(progress_bytes(&commands).is_some());
+    }
+
+    #[test]
+    fn modal_and_position_transitions_clear_reader_without_changing_legacy_page_turns() {
+        let (mut runner, _) = runner_with_collections(vec![
+            (PUZZLES_FILE, RICH_PUZZLES.to_vec()),
+            ("puzzles-endgames.json", ALT_PUZZLES.to_vec()),
+        ]);
+        let target = runner.app().puzzles[0]
+            .analysis.as_ref().unwrap().by_id("n2").unwrap();
+        let h2 = square_from_name("h2").unwrap();
+        let h1 = square_from_name("h1").unwrap();
+        runner.action(action_id(&square_action(h2)));
+        runner.action(action_id(&square_action(h1)));
+        assert!(runner.app().pending_promotion.is_some());
+        assert!(!runner.app_mut().open_analysis());
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        assert!(!runner.app().analysis_browser.is_open());
+        runner.action(action_id(PROMOTION_CANCEL));
+
+        assert!(runner.app_mut().open_analysis());
+        assert!(runner.app_mut().select_analysis_node(target));
+        runner.page_turn(true);
+        assert!(runner.app().analysis_browser.is_open());
+        assert_eq!(runner.app().puzzle_index, 0);
+        runner.action(action_id(RESET));
+        assert!(!runner.app().analysis_browser.is_open());
+        assert!(runner.app().analysis_browser.preview_board().is_none());
+
+        assert!(runner.app_mut().open_analysis());
+        assert!(runner.app_mut().select_analysis_node(target));
+        runner.action(action_id(MODE_TOGGLE));
+        assert_eq!(runner.app().mode, BoardMode::FreeBoard);
+        assert!(!runner.app().analysis_browser.is_open());
+        assert!(!runner.app_mut().open_analysis());
+        runner.action(action_id(MODE_TOGGLE));
+
+        assert!(runner.app_mut().open_analysis());
+        runner.action(action_id(PUZZLE_PICKER));
+        assert!(!runner.app().analysis_browser.is_open());
+        assert!(runner.app().picker_open);
+        assert!(!runner.app_mut().open_analysis());
+        runner.action(action_id(PUZZLE_PICKER_CANCEL));
+
+        assert!(runner.app_mut().open_analysis());
+        assert!(runner.app_mut().select_analysis_node(target));
+        let index = runner.app().collections.iter()
+            .position(|entry| entry.key == "puzzles-endgames.json").unwrap();
+        runner.action(action_id(PUZZLE_PICKER));
+        let commands = runner.action(action_id(&collection_action(index)));
+        assert!(!runner.app().analysis_browser.is_open());
+        assert!(commands.iter().any(|command| matches!(
+            command, Command::Store(StoreRequest::Load { key })
+                if key == "puzzles-endgames.json"
+        )));
+        runner.store_result(StoreResult::Loaded {
+            key: "puzzles-endgames.json".into(),
+            value: Some(ALT_PUZZLES.to_vec()),
+        });
+        assert_eq!(runner.app().puzzles[0].id, "end-1");
+        assert!(runner.app().analysis_browser.preview_board().is_none());
+        // Legacy descriptions are readable, but cannot synthesize analysis nodes.
+        assert!(runner.app_mut().open_analysis());
+        assert!(!runner.app_mut().select_analysis_node(target));
+        assert!(runner.app().analysis_browser.preview_board().is_none());
+        runner.app_mut().close_analysis();
+
+        // Normal page turns still navigate puzzles once the reader is closed.
+        runner.page_turn(true);
+        assert_eq!(runner.app().puzzle_index, 1);
+        runner.page_turn(false);
+        assert_eq!(runner.app().puzzle_index, 0);
+    }
+
+
+    #[test]
+    fn suspend_and_resume_discard_preview_but_keep_the_live_attempt() {
+        let (mut runner, _) = runner(Some(rich_with_continuation()));
+        play(&mut runner, "h2h1q");
+        let before = attempt_snapshot(runner.app());
+        let alternative = runner.app().puzzles[0].analysis
+            .as_ref().unwrap().by_id("n2").unwrap();
+        assert!(runner.app_mut().open_analysis());
+        assert!(runner.app_mut().select_analysis_node(alternative));
+        assert_ne!(runner.app().displayed_board(), &before.board);
+
+        assert_no_progress_write(&runner.suspend());
+        assert!(runner.app().sleeping);
+        assert!(!runner.app().analysis_browser.is_open());
+        assert_eq!(runner.app().analysis_browser.selected_node(), None);
+        assert_eq!(runner.app().displayed_board(), &before.board);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert!(!runner.app_mut().open_analysis());
+
+        assert_no_progress_write(&runner.resume());
+        assert!(!runner.app().sleeping);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        play(&mut runner, "h1h2");
+        assert!(runner.app().current_is_solved());
+    }
+
 }
