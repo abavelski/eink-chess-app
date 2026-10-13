@@ -188,13 +188,23 @@ mod tests {
 
     #[test]
     fn blank_null_nonstring_topic_falls_back_to_side_to_move() {
-        for topic in [json!(null), json!(123), json!([]), json!({}), json!(""), json!(" \n\t ")] {
+        for topic in [
+            json!(null),
+            json!(123),
+            json!([]),
+            json!({}),
+            json!(""),
+            json!(" \n\t "),
+        ] {
             let mut data = sample();
             data["puzzles"][0]["topic"] = topic;
             assert_eq!(view(&parse(data), false).status, "White to move");
         }
         let mut absent = sample();
-        absent["puzzles"][0].as_object_mut().unwrap().remove("topic");
+        absent["puzzles"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("topic");
         assert_eq!(view(&parse(absent), false).status, "White to move");
         let mut black = sample();
         black["puzzles"][0]["fen"] = json!("8/8/8/8/8/5kq1/8/7K b - - 0 1");
@@ -210,7 +220,9 @@ mod tests {
         assert!(reader.available());
         assert_eq!(
             reader.preface,
-            &[ContentSpan::Text("Legacy Nd5 is plain.\nСтрока два.".into())]
+            &[ContentSpan::Text(
+                "Legacy Nd5 is plain.\nСтрока два.".into()
+            )]
         );
         assert!(reader.root_content.is_none());
         assert_eq!(view(&puzzle, false).revealed_description, None);
@@ -292,7 +304,10 @@ mod tests {
         data["puzzles"][0]["description"] = json!(description);
         let puzzle = parse(data);
         assert_eq!(view(&puzzle, false).status, topic);
-        assert_eq!(view(&puzzle, true).revealed_description.as_deref(), Some(description.as_str()));
+        assert_eq!(
+            view(&puzzle, true).revealed_description.as_deref(),
+            Some(description.as_str())
+        );
         assert_eq!(analysis_text(&puzzle).preface.len(), 1);
     }
 }

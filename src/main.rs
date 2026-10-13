@@ -1,8 +1,8 @@
 mod analysis;
 mod board;
 mod large_collection;
-mod progress;
 mod presentation;
+mod progress;
 mod puzzle;
 
 use board::{Board, Color, Piece, PieceKind, TapResult};
@@ -11,8 +11,8 @@ use kobo_sdk::{
     SlotWidth, StoreResult,
 };
 use large_collection::{CollectionReader, ReadMode, ReadProgress};
-use progress::Progress;
 use presentation::{solution_text, StatusMode};
+use progress::Progress;
 use puzzle::{parse_puzzle_file, Puzzle, PuzzleCollection};
 use std::{collections::VecDeque, process::ExitCode};
 
@@ -1707,17 +1707,23 @@ mod tests {
         let diagnostics =
             screen.diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
         assert!(!diagnostics.has_errors(), "{:?}", diagnostics.issues);
-        assert!(!diagnostics.layout.nodes.iter().any(|node| {
-            node.kind.acts_on() == Some(action_id("description-toggle"))
-        }));
-        assert!(!screen.nodes.iter().any(
-            |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
-        ));
+        assert!(!diagnostics
+            .layout
+            .nodes
+            .iter()
+            .any(|node| { node.kind.acts_on() == Some(action_id("description-toggle")) }));
+        assert!(
+            !screen.nodes.iter().any(
+                |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+            )
+        );
 
         play(&mut runner, "d7e8");
-        assert!(runner.app().screen().nodes.iter().any(
-            |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
-        ));
+        assert!(
+            runner.app().screen().nodes.iter().any(
+                |node| matches!(node, kobo_sdk::Node::Text { text, .. } if text == &description),
+            )
+        );
         assert!(runner.app().current_is_solved());
         runner.action(action_id(RESET));
         assert!(runner.app().current_is_solved());
@@ -2574,12 +2580,7 @@ mod tests {
                         kobo_sdk::LayoutKind::Cell(_, _, selected)
                             if selected == (mode == BoardMode::FreeBoard)
                     ));
-                    for action in [
-                        MODE_TOGGLE,
-                        ORIENTATION_LOCK,
-                        RESET,
-                        FLIP,
-                    ] {
+                    for action in [MODE_TOGGLE, ORIENTATION_LOCK, RESET, FLIP] {
                         let button = rect_for(action_id(action));
                         assert!(
                             (button.width - button.height).abs() <= 1,
