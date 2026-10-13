@@ -121,9 +121,9 @@ the lowercase piece: `a7a8q`, `a7a8r`, `a7a8b`, or `a7a8n`. Standard castling
 uses the king's move, such as `e1g1`.
 
 For a two-move solution, the array normally contains the solver's first move,
-the opponent's reply, and the solver's second move. The file represents one
-main solution line; branching alternatives can be introduced in a later
-format version. Optional rich analysis already supports branches as parser data; the Kobo UI does not yet expose them.
+the opponent's reply, and the solver's second move. The file represents one graded
+main solution line. Optional rich analysis supports browse-only branches as
+parser data, but the Kobo UI does not yet expose them.
 
 The app validates FENs and move notation, displays the turn,
 and uses the solution as an exact move sequence. The user enters only the solver

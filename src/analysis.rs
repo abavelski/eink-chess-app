@@ -114,7 +114,11 @@ impl AnalysisTree {
     }
 
     /// Validate links and the projected main line before resolving any prose references.
-    pub(crate) fn parse(value: &Value, puzzle_fen: &str, solution: &[String]) -> Result<Self, String> {
+    pub(crate) fn parse(
+        value: &Value,
+        puzzle_fen: &str,
+        solution: &[String],
+    ) -> Result<Self, String> {
         let data = object(value, "analysis")?;
         if data.get("version").and_then(Value::as_u64) != Some(1) {
             return Err("analysis.version must be integer 1".into());
@@ -159,7 +163,8 @@ impl AnalysisTree {
             } else {
                 let parent = nonempty_string(data, "parent", &where_)?.to_owned();
                 let movement = object(
-                    data.get("move").ok_or_else(|| format!("{where_} ({id}): missing move"))?,
+                    data.get("move")
+                        .ok_or_else(|| format!("{where_} ({id}): missing move"))?,
                     &format!("{where_} ({id}).move"),
                 )?;
                 if movement.len() != 2
@@ -263,10 +268,16 @@ impl AnalysisTree {
                     format!("node {:?}: missing child {child_id:?}", nodes[index].id)
                 })?;
                 if child == root {
-                    return Err(format!("node {:?}: root cannot be a child", nodes[index].id));
+                    return Err(format!(
+                        "node {:?}: root cannot be a child",
+                        nodes[index].id
+                    ));
                 }
                 if !unique.insert(child) || inbound[child.0] != 0 {
-                    return Err(format!("node {:?}: duplicate/multiple-parent child {child_id:?}", nodes[index].id));
+                    return Err(format!(
+                        "node {:?}: duplicate/multiple-parent child {child_id:?}",
+                        nodes[index].id
+                    ));
                 }
                 if nodes[child.0].parent != Some(NodeHandle(index)) {
                     return Err(format!(
@@ -289,7 +300,10 @@ impl AnalysisTree {
         let mut stack = vec![root];
         while let Some(handle) = stack.pop() {
             if !visited.insert(handle) {
-                return Err(format!("analysis: repeated/cyclic node {:?}", nodes[handle.0].id));
+                return Err(format!(
+                    "analysis: repeated/cyclic node {:?}",
+                    nodes[handle.0].id
+                ));
             }
             stack.extend(nodes[handle.0].children.iter().copied());
         }
@@ -369,7 +383,9 @@ pub(crate) fn parse_content(
             match data.get("type").and_then(Value::as_str) {
                 Some("text") => {
                     if data.len() != 2 || !data.contains_key("text") {
-                        return Err(format!("{where_}: text span must have exactly type and text"));
+                        return Err(format!(
+                            "{where_}: text span must have exactly type and text"
+                        ));
                     }
                     Ok(ContentSpan::Text(
                         nonempty_string(data, "text", &where_)?.to_owned(),
@@ -382,9 +398,8 @@ pub(crate) fn parse_content(
                         return Err(format!("{where_}: invalid move_ref keys"));
                     }
                     let id = nonempty_string(data, "node", &where_)?;
-                    let tree = tree.ok_or_else(|| {
-                        format!("{where_}: move_ref requires an analysis tree")
-                    })?;
+                    let tree = tree
+                        .ok_or_else(|| format!("{where_}: move_ref requires an analysis tree"))?;
                     let node = tree
                         .by_id(id)
                         .ok_or_else(|| format!("{where_}: dangling move_ref {id:?}"))?;

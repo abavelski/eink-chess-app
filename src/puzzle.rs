@@ -298,9 +298,18 @@ mod tests {
     #[test]
     fn pinned_corpus_accepts_valid_books_and_rejects_all_invalid_rich_fixtures() {
         for (name, data) in [
-            ("rich", &include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json")[..]),
-            ("book", &include_bytes!("../tests/fixtures/kindle-parity/pgn-converter/valid-book.json")[..]),
-            ("legacy", &include_bytes!("../tests/fixtures/kindle-parity/puzzles.json")[..]),
+            (
+                "rich",
+                &include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json")[..],
+            ),
+            (
+                "book",
+                &include_bytes!("../tests/fixtures/kindle-parity/pgn-converter/valid-book.json")[..],
+            ),
+            (
+                "legacy",
+                &include_bytes!("../tests/fixtures/kindle-parity/puzzles.json")[..],
+            ),
         ] {
             assert!(parse_puzzle_file(data).is_ok(), "{name}");
         }
@@ -335,22 +344,45 @@ mod tests {
         assert_eq!(tree.node(root).unwrap().id(), "n0");
         assert_eq!(tree.node(root).unwrap().parent(), None);
         assert_eq!(tree.node(root).unwrap().fen(), puzzle.fen.as_str());
-        assert_eq!(tree.node(root).unwrap().children().iter().map(|&h| tree.node(h).unwrap().id()).collect::<Vec<_>>(), ["n1", "n2", "n3"]);
+        assert_eq!(
+            tree.node(root)
+                .unwrap()
+                .children()
+                .iter()
+                .map(|&h| tree.node(h).unwrap().id())
+                .collect::<Vec<_>>(),
+            ["n1", "n2", "n3"]
+        );
         let main = tree.by_id("n1").unwrap();
         assert_eq!(main.index(), 1);
         assert_eq!(tree.node(main).unwrap().parent(), Some(root));
         assert_eq!(tree.node(main).unwrap().movement().unwrap().san, "h1=Q+");
         assert_eq!(tree.node(main).unwrap().role(), Some(MoveRole::Main));
         assert_eq!(tree.node(main).unwrap().nags(), [1]);
-        assert_eq!(tree.node(tree.by_id("n2").unwrap()).unwrap().role(), Some(MoveRole::Alternative));
-        assert_eq!(tree.node(tree.by_id("n3").unwrap()).unwrap().role(), Some(MoveRole::Sideline));
+        assert_eq!(
+            tree.node(tree.by_id("n2").unwrap()).unwrap().role(),
+            Some(MoveRole::Alternative)
+        );
+        assert_eq!(
+            tree.node(tree.by_id("n3").unwrap()).unwrap().role(),
+            Some(MoveRole::Sideline)
+        );
         assert_eq!(tree.node(tree.by_id("n3").unwrap()).unwrap().content(), &[]);
-        assert_eq!(puzzle.description_content[0], ContentSpan::Text("Choose ".into()));
-        assert_eq!(puzzle.description_content[1], ContentSpan::MoveRef {
-            node: main,
-            label: Some("1...h1=Q+".into()),
-        });
-        assert_eq!(puzzle.description_content[4], ContentSpan::Text(". The text h1=N is deliberately plain.".into()));
+        assert_eq!(
+            puzzle.description_content[0],
+            ContentSpan::Text("Choose ".into())
+        );
+        assert_eq!(
+            puzzle.description_content[1],
+            ContentSpan::MoveRef {
+                node: main,
+                label: Some("1...h1=Q+".into()),
+            }
+        );
+        assert_eq!(
+            puzzle.description_content[4],
+            ContentSpan::Text(". The text h1=N is deliberately plain.".into())
+        );
         assert!(tree.node(tree.by_id("n2").unwrap()).unwrap().content().iter().any(|span| matches!(span, ContentSpan::Text(text) if text == "An explicitly marked alternative.")));
     }
 
@@ -363,15 +395,24 @@ mod tests {
         let puzzle = &parse(value.clone()).unwrap().puzzles[0];
         assert_eq!(puzzle.topic.as_deref(), Some("Промоция\nMate"));
         assert!(puzzle.analysis.is_none());
-        assert_eq!(puzzle.description_content, [ContentSpan::Text("Plain SAN Qg7# stays plain.".into())]);
+        assert_eq!(
+            puzzle.description_content,
+            [ContentSpan::Text("Plain SAN Qg7# stays plain.".into())]
+        );
         value["puzzles"][0]["description_content"] = json!([]);
-        assert!(parse(value.clone()).unwrap().puzzles[0].description_content.is_empty());
+        assert!(parse(value.clone()).unwrap().puzzles[0]
+            .description_content
+            .is_empty());
         value["puzzles"][0]["topic"] = json!(["not a string"]);
         assert!(parse(value.clone()).unwrap().puzzles[0].topic.is_none());
         value["puzzles"][0]["topic"] = json!(null);
         assert!(parse(value.clone()).unwrap().puzzles[0].topic.is_none());
-        value["puzzles"][0]["description_content"] = json!([{"type":"text","text":"e2e4 is still plain"}]);
-        assert_eq!(parse(value).unwrap().puzzles[0].description_content, [ContentSpan::Text("e2e4 is still plain".into())]);
+        value["puzzles"][0]["description_content"] =
+            json!([{"type":"text","text":"e2e4 is still plain"}]);
+        assert_eq!(
+            parse(value).unwrap().puzzles[0].description_content,
+            [ContentSpan::Text("e2e4 is still plain".into())]
+        );
 
         let mut value = rich();
         value["puzzles"][0]["analysis"]["nodes"][0]["content"] = json!([]);
@@ -392,47 +433,148 @@ mod tests {
             assert!(error.contains("analysis"), "{name}: {error}");
         }
 
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["id"] = json!("n0")).contains("duplicate"));
-        assert!(rejected(|v| { v["puzzles"][0]["analysis"]["nodes"][1].as_object_mut().unwrap().remove("parent"); }).contains("parent"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["parent"] = json!("lost")).contains("parent"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n1", "n2", "n3"])).contains("child"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n2"])).contains("link"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["children"] = json!(["n2"])).contains("child"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n2", "n3", "missing"])).contains("missing child"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n0", "n1", "n2", "n3"])).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["parent"] = json!("n3")).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["move"] = json!({"uci":"e2e4","san":"e4"})).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["role"] = json!("main")).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["nags"] = json!([])).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["fen"] = json!("8/8/8/8/8/8/8/8 w - - 0 1")).contains("root FEN"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["fen"] = json!("invalid")).contains("FEN"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["uci"] = json!("h2h1k")).contains("uci"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["san"] = json!("")).contains("san"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["extra"] = json!(1)).contains("exactly"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][2]["role"] = json!("other")).contains("role"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["nags"] = json!([-1])).contains("NAG"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["nags"] = json!([1.5])).contains("NAG"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["id"] = json!("n0"))
+                .contains("duplicate")
+        );
+        assert!(rejected(|v| {
+            v["puzzles"][0]["analysis"]["nodes"][1]
+                .as_object_mut()
+                .unwrap()
+                .remove("parent");
+        })
+        .contains("parent"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["parent"] = json!("lost"))
+                .contains("parent")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] =
+                json!(["n1", "n1", "n2", "n3"]))
+            .contains("child")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] = json!(["n1", "n2"])
+        )
+        .contains("link"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["children"] = json!(["n2"]))
+                .contains("child")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] =
+                json!(["n1", "n2", "n3", "missing"]))
+            .contains("missing child")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["children"] =
+                json!(["n0", "n1", "n2", "n3"]))
+            .contains("root")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["parent"] = json!("n3"))
+                .contains("root")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["analysis"]["nodes"][0]["move"] = json!({"uci":"e2e4","san":"e4"})
+        )
+        .contains("root"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["role"] = json!("main"))
+                .contains("root")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][0]["nags"] = json!([]))
+                .contains("root")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["analysis"]["nodes"][0]["fen"] = json!("8/8/8/8/8/8/8/8 w - - 0 1")
+        )
+        .contains("root FEN"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["fen"] = json!("invalid"))
+                .contains("FEN")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["uci"] = json!("h2h1k")
+        )
+        .contains("uci"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["san"] = json!(""))
+                .contains("san")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["move"]["extra"] = json!(1))
+                .contains("exactly")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][2]["role"] = json!("other"))
+                .contains("role")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["nags"] = json!([-1]))
+                .contains("NAG")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["nags"] = json!([1.5]))
+                .contains("NAG")
+        );
         assert!(rejected(|v| v["puzzles"][0]["solution"] = json!(["h2h1n"])).contains("solution"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][2]["role"] = json!("main")).contains("multiple main"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][2]["role"] = json!("main"))
+                .contains("multiple main")
+        );
     }
 
     #[test]
     fn rich_span_mutations_are_rejected_but_empty_lists_are_authoritative() {
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"text"}])).contains("text"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"text","text":""}])).contains("text"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"text","text":"ok","extra":1}])).contains("exactly"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"n2","extra":true}])).contains("keys"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"n2","label":""}])).contains("label"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"n0"}])).contains("root"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"lost"}])).contains("dangling"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref"}])).contains("keys"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"link","node":"n2"}])).contains("type"));
-        assert!(rejected(|v| v["puzzles"][0]["description_content"] = json!(null)).contains("array"));
-        assert!(rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["content"] = json!([{"type":"move_ref","node":"lost"}])).contains("dangling"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"text"}]))
+                .contains("text")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["description_content"] = json!([{"type":"text","text":""}])
+        )
+        .contains("text"));
+        assert!(rejected(|v| v["puzzles"][0]["description_content"] =
+            json!([{"type":"text","text":"ok","extra":1}]))
+        .contains("exactly"));
+        assert!(rejected(|v| v["puzzles"][0]["description_content"] =
+            json!([{"type":"move_ref","node":"n2","extra":true}]))
+        .contains("keys"));
+        assert!(rejected(|v| v["puzzles"][0]["description_content"] =
+            json!([{"type":"move_ref","node":"n2","label":""}]))
+        .contains("label"));
+        assert!(rejected(
+            |v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"n0"}])
+        )
+        .contains("root"));
+        assert!(rejected(
+            |v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"lost"}])
+        )
+        .contains("dangling"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["description_content"] = json!([{"type":"move_ref"}]))
+                .contains("keys")
+        );
+        assert!(rejected(
+            |v| v["puzzles"][0]["description_content"] = json!([{"type":"link","node":"n2"}])
+        )
+        .contains("type"));
+        assert!(
+            rejected(|v| v["puzzles"][0]["description_content"] = json!(null)).contains("array")
+        );
+        assert!(
+            rejected(|v| v["puzzles"][0]["analysis"]["nodes"][1]["content"] =
+                json!([{"type":"move_ref","node":"lost"}]))
+            .contains("dangling")
+        );
         assert!(rejected(|v| v["puzzles"][0]["analysis"] = json!(null)).contains("object"));
         let mut value = sample();
         value["puzzles"][0]["description_content"] = json!([{"type":"move_ref","node":"n1"}]);
-        assert!(parse(value).unwrap_err().contains("requires an analysis tree"));
+        assert!(parse(value)
+            .unwrap_err()
+            .contains("requires an analysis tree"));
     }
 
     #[test]
@@ -448,5 +590,4 @@ mod tests {
         oversized.resize(8_388_609, b' ');
         assert!(parse_puzzle_file(&oversized).unwrap_err().contains("8 MiB"));
     }
-
 }
