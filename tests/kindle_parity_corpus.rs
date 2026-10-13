@@ -170,13 +170,22 @@ fn corpus_manifest_pins_paths_labels_and_raw_byte_hashes() {
 fn existing_legacy_example_was_not_replaced_by_the_kindle_control() {
     let manifest: Manifest =
         serde_json::from_str(include_str!("fixtures/kindle-parity/manifest.json")).unwrap();
-    assert_eq!(manifest.legacy_control.path, "tests/fixtures/kobo-legacy-main-example.json");
+    assert_eq!(
+        manifest.legacy_control.path,
+        "tests/fixtures/kobo-legacy-main-example.json"
+    );
     assert_eq!(manifest.legacy_control.sha256, LEGACY_EXAMPLE_SHA256);
     let original = include_bytes!("fixtures/kobo-legacy-main-example.json");
     assert_eq!(sha256_hex(original), LEGACY_EXAMPLE_SHA256);
     assert_eq!(manifest.current_app_example.path, "examples/puzzles.json");
-    assert_eq!(manifest.current_app_example.sha256, "849d4e8463e55e696fffd7ca6f4cb5a1f3dfc12b3b6705b817de4767cb1069eb");
-    assert_eq!(sha256_hex(include_bytes!("../examples/puzzles.json")), manifest.current_app_example.sha256);
+    assert_eq!(
+        manifest.current_app_example.sha256,
+        "849d4e8463e55e696fffd7ca6f4cb5a1f3dfc12b3b6705b817de4767cb1069eb"
+    );
+    assert_eq!(
+        sha256_hex(include_bytes!("../examples/puzzles.json")),
+        manifest.current_app_example.sha256
+    );
     assert_ne!(
         &original[..],
         &include_bytes!("fixtures/kindle-parity/puzzles.json")[..]
