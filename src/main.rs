@@ -653,6 +653,11 @@ impl ChessBoardApp {
         let orientation_locked = self.orientation_locked;
         let analysis_open = self.analysis_browser.is_open();
         let analysis_available = self.analysis_available();
+        let analysis_pages = if analysis_open { self.analysis_pages() } else { Vec::new() };
+        let analysis_position = self.analysis_browser.page().min(analysis_pages.len().saturating_sub(1));
+        let title = if analysis_open {
+            format!("{title} · Analysis {}/{}", analysis_position + 1, analysis_pages.len())
+        } else { title };
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
@@ -663,26 +668,32 @@ impl ChessBoardApp {
                 [
                     (
                         SlotWidth::Fill,
-                        Box::new(|slot: ScreenBuilder| slot)
-                            as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
-                    ),
-                    (
-                        // Always visible alongside the four original controls.
-                        // No NOTE, alternate board, review tab or settings page.
-                        SlotWidth::Fixed(130),
-                        Box::new(move |slot| {
-                            if analysis_available {
-                                if analysis_open {
-                                    slot.primary_button(ANALYSIS_TOGGLE, "Analysis ON")
-                                } else {
-                                    slot.button(ANALYSIS_TOGGLE, "Analysis")
-                                }
+                        // Use the *existing* vacant slot, keeping original
+                        // four controls flush with the outer board border.
+                        // Navigation lives at the same height as the toolbar;
+                        // nothing extra consumes board height below it.
+                        Box::new(move |slot: ScreenBuilder| {
+                            if analysis_open {
+                                slot.controls_with_selection(
+                                    4,
+                                    [
+                                        (ANALYSIS_PREVIOUS, "Previous analysis page", Glyph::Previous, false),
+                                        (ANALYSIS_TOGGLE, "Analysis active", Glyph::Book, true),
+                                        (ANALYSIS_NEXT, "Next analysis page", Glyph::Next, false),
+                                        (ANALYSIS_CLOSE, "Close analysis", Glyph::Close, false),
+                                    ],
+                                )
+                            } else if analysis_available {
+                                slot.controls_with_selection(
+                                    1,
+                                    [(ANALYSIS_TOGGLE, "Open Analysis", Glyph::Book, false)],
+                                )
                             } else {
                                 slot.button_with_state(
                                     ANALYSIS_TOGGLE, "Analysis", ControlState::Disabled
                                 )
                             }
-                        }),
+                        }) as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
                         // Four original 10 mm controls and right alignment.
@@ -720,36 +731,11 @@ impl ChessBoardApp {
                 self.description_visible,
             );
             if analysis_open {
-                let pages = self.analysis_pages();
-                let page = self.analysis_browser.page().min(pages.len().saturating_sub(1));
-                screen = screen.secondary(format!("Analysis  {}/{}", page + 1, pages.len()));
-                if let Some(content) = pages.get(page) {
+                if let Some(content) = analysis_pages.get(analysis_position) {
                     screen = Self::analysis_page(
                         screen, content, self.analysis_browser.selected_node()
                     );
                 }
-                let has_previous = page > 0;
-                let has_next = page + 1 < pages.len();
-                screen = screen.band(
-                    BandAlign::Middle,
-                    [
-                        (SlotWidth::Fill, Box::new(move |slot: ScreenBuilder| {
-                            slot.button_with_state(
-                                ANALYSIS_PREVIOUS, "Previous",
-                                if has_previous { ControlState::Enabled } else { ControlState::Disabled },
-                            )
-                        }) as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>),
-                        (SlotWidth::Fill, Box::new(|slot: ScreenBuilder| {
-                            slot.button(ANALYSIS_CLOSE, "Close")
-                        })),
-                        (SlotWidth::Fill, Box::new(move |slot: ScreenBuilder| {
-                            slot.button_with_state(
-                                ANALYSIS_NEXT, "Next",
-                                if has_next { ControlState::Enabled } else { ControlState::Disabled },
-                            )
-                        })),
-                    ],
-                );
             } else {
                 screen = screen.secondary(view.status);
                 if let Some(description) = view.revealed_description {
@@ -1917,8 +1903,7 @@ mod tests {
             .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
             .unwrap().rect, old_board);
         assert!(layout.layout.nodes.iter().any(|node| matches!(
-            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Enabled, kobo_sdk::Emphasis::Primary)
-                if id == action_id(ANALYSIS_TOGGLE)
+            node.kind, kobo_sdk::LayoutKind::Cell(id, _, true) if id == action_id(ANALYSIS_TOGGLE)
         )));
         assert!(opened.nodes.iter().any(|node| matches!(node, kobo_sdk::Node::RichText { .. })));
         for name in [ANALYSIS_PREVIOUS, ANALYSIS_NEXT, ANALYSIS_CLOSE] {
@@ -1931,8 +1916,7 @@ mod tests {
             .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
             .unwrap().rect, old_board);
         assert!(closed.layout.nodes.iter().any(|node| matches!(
-            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Enabled, kobo_sdk::Emphasis::Normal)
-                if id == action_id(ANALYSIS_TOGGLE)
+            node.kind, kobo_sdk::LayoutKind::Cell(id, _, false) if id == action_id(ANALYSIS_TOGGLE)
         )));
     }
 

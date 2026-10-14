@@ -5,11 +5,11 @@ use crate::analysis::NodeHandle;
 use crate::pgn_projection::{AnalysisDocument, RunOrigin};
 
 // Intentionally conservative: the full-size chessboard is never resized.
-pub const PAGE_CHARS: usize = 64;
+pub const PAGE_CHARS: usize = 32;
 pub const PAGE_NEWLINES: usize = 1;
 pub const PAGE_LINKS: usize = 3;
 /// Bound unbreakable words without inserting invisible characters into prose.
-pub const PAGE_WORD_CHARS: usize = 28;
+pub const PAGE_WORD_CHARS: usize = 20;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PageFragment {
