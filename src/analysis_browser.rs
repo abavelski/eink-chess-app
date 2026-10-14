@@ -20,6 +20,8 @@ struct PreviewPosition {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AnalysisBrowser {
     open: bool,
+    // Advances every time analysis opens, invalidating stale Cobalt link IDs.
+    epoch: u64,
     page: usize,
     preview: Option<PreviewPosition>,
 }
@@ -31,6 +33,10 @@ impl AnalysisBrowser {
 
     pub fn page(&self) -> usize {
         self.page
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn selected_node(&self) -> Option<NodeHandle> {
@@ -52,6 +58,7 @@ impl AnalysisBrowser {
             return false;
         }
         self.open = true;
+        self.epoch = self.epoch.wrapping_add(1);
         self.page = 0;
         self.preview = None;
         true
@@ -60,7 +67,9 @@ impl AnalysisBrowser {
     /// Clear all reader state before any operation that changes the live board.
     pub fn close(&mut self) -> bool {
         let was_open = self.open;
-        *self = Self::default();
+        self.open = false;
+        self.page = 0;
+        self.preview = None;
         was_open
     }
 
@@ -186,8 +195,13 @@ mod tests {
             browser.preview_board(),
             Some(&Board::from_fen(&puzzle.fen).unwrap())
         );
+        let epoch = browser.epoch();
         assert!(browser.close());
         assert!(!browser.close());
+        assert_eq!(browser.epoch(), epoch);
+        assert!(browser.open(&puzzle));
+        assert_ne!(browser.epoch(), epoch);
+        assert!(browser.close());
         assert_eq!(browser.page(), 0);
         assert_eq!(browser.selected_node(), None);
         assert!(browser.preview_board().is_none());

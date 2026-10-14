@@ -427,6 +427,7 @@ impl ChessBoardApp {
         screen: ScreenBuilder,
         page: &AnalysisPage,
         selected: Option<NodeHandle>,
+        epoch: u64,
     ) -> ScreenBuilder {
         let mut text = String::new();
         let mut spans = Vec::new();
@@ -446,7 +447,7 @@ impl ChessBoardApp {
                         ..TextPresentation::default()
                     },
                 });
-                links.push((link_action(fragment.source_run), start, end));
+                links.push((link_action(epoch, fragment.source_run), start, end));
             }
         }
         // PAGE_LINKS (3) is below SDK MAX_TEXT_LINKS (16); styling one
@@ -767,8 +768,12 @@ impl ChessBoardApp {
             );
             if analysis_open {
                 if let Some(content) = analysis_pages.get(analysis_position) {
-                    screen =
-                        Self::analysis_page(screen, content, self.analysis_browser.selected_node());
+                    screen = Self::analysis_page(
+                        screen,
+                        content,
+                        self.analysis_browser.selected_node(),
+                        self.analysis_browser.epoch(),
+                    );
                 }
             } else {
                 screen = screen.secondary(view.status);
@@ -1143,18 +1148,20 @@ impl KoboApp for ChessBoardApp {
                 }
                 return;
             }
-            if let Some(puzzle) = self.puzzles.get(self.puzzle_index) {
-                let document = project_analysis(puzzle);
-                for (index, run) in document.runs.iter().enumerate() {
-                    if let Some(target) = run.target {
-                        if action == action_id(&link_action(index)) {
-                            if self.select_analysis_node(target) {
-                                self.show(context);
-                            }
-                            return;
-                        }
-                    }
+            // Resolve only the visible page's explicit semantic links. The
+            // action name embeds this reader's epoch, and select() validates
+            // the node against the current puzzle's parsed tree.
+            let target = self
+                .analysis_pages()
+                .get(self.analysis_browser.page())
+                .and_then(|page| {
+                    page.target_for_action(action, self.analysis_browser.epoch())
+                });
+            if let Some(target) = target {
+                if self.select_analysis_node(target) {
+                    self.show(context);
                 }
+                return;
             }
         }
 
@@ -2082,7 +2089,7 @@ mod tests {
         while runner.app().analysis_browser.page() < target_page {
             runner.action(action_id(ANALYSIS_NEXT));
         }
-        runner.action(action_id(&link_action(run_index)));
+        runner.action(action_id(&link_action(runner.app().analysis_browser.epoch(), run_index)));
         assert_eq!(runner.app().analysis_browser.selected_node(), Some(target));
         assert!(runner.app().screen().nodes.iter().any(|node| matches!(
             node, kobo_sdk::Node::RichText { spans, .. }
@@ -3367,6 +3374,208 @@ mod tests {
         play(&mut runner, "h1h2");
         assert!(runner.app().current_is_solved());
     }
+    fn rich_with_duplicate_refs_and_nested_variations() -> Vec<u8> {
+        use serde_json::json;
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&rich_with_continuation()).unwrap();
+        value["puzzles"][0]["description_content"] = json!([
+            {"type": "text", "text": "h1=Q+ e2e4; "},
+            {"type": "move_ref", "node": "n2", "label": "repeat"},
+            {"type": "text", "text": " / "},
+            {"type": "move_ref", "node": "n3", "label": "repeat"},
+            {"type": "text", "text": " / "},
+            {"type": "move_ref", "node": "n1"}
+        ]);
+        // Two distinct tree positions with the same visible SAN.
+        value["puzzles"][0]["analysis"]["nodes"][3]["move"]["san"] = json!("h1=N");
+        value["puzzles"][0]["analysis"]["nodes"][4]["children"] = json!(["n5", "n6"]);
+        value["puzzles"][0]["analysis"]["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+                "id": "n6", "parent": "n4",
+                "move": {"uci": "h1h3", "san": "Qh3"},
+                "role": "sideline",
+                "fen": "k7/8/8/8/8/7q/K7/8 w - - 2 3"
+            }));
+        serde_json::to_vec(&value).unwrap()
+    }
+
+    #[test]
+    fn all_analysis_move_and_prose_taps_preview_exact_stored_fens() {
+        use crate::pgn_projection::RunOrigin;
+
+        let (mut runner, _) = runner(Some(rich_with_duplicate_refs_and_nested_variations()));
+        let document = project_analysis(&runner.app().puzzles[0]);
+        let pages = paginate(&document);
+        let before = attempt_snapshot(runner.app());
+        let targets: Vec<_> = document
+            .runs
+            .iter()
+            .enumerate()
+            .filter_map(|(run, text)| text.target.map(|node| (run, text.origin, node)))
+            .collect();
+        assert!(targets.iter().any(|(_, origin, _)| *origin == RunOrigin::TreeMove));
+        assert!(targets.iter().any(|(_, origin, _)| *origin == RunOrigin::ExplicitMoveRef));
+        assert!(targets.len() > 7);
+        assert!(pages.len() > 3);
+
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        let epoch = runner.app().analysis_browser.epoch();
+        let mut ids = Vec::new();
+        for &(run, origin, node) in &targets {
+            let action = action_id(&link_action(epoch, run));
+            assert!(!ids.contains(&action), "different runs must have different IDs");
+            ids.push(action);
+            let page = pages
+                .iter()
+                .position(|page| page.fragments.iter().any(|part| {
+                    part.source_run == run && part.target == Some(node)
+                }))
+                .unwrap();
+            while runner.app().analysis_browser.page() < page {
+                assert_no_progress_write(&runner.action(action_id(ANALYSIS_NEXT)));
+            }
+            while runner.app().analysis_browser.page() > page {
+                assert_no_progress_write(&runner.action(action_id(ANALYSIS_PREVIOUS)));
+            }
+
+            let screen = runner.app().screen();
+            let mut offset = 0;
+            let mut expected_range = None;
+            for fragment in &pages[page].fragments {
+                if fragment.source_run == run && fragment.target == Some(node) {
+                    expected_range = Some((offset, offset + fragment.text.len(), fragment.text.as_str()));
+                }
+                offset += fragment.text.len();
+            }
+            let (start, end, label) = expected_range.unwrap();
+            assert!(screen.nodes.iter().any(|entry| matches!(
+                entry,
+                kobo_sdk::Node::RichText { text, links, .. }
+                if &text[start..end] == label && links.iter().any(|link| {
+                    link.action == action && link.start == start && link.end == end
+                })
+            )), "missing exact range for {origin:?} run {run}");
+            let fen = runner.app().puzzles[0]
+                .analysis
+                .as_ref()
+                .unwrap()
+                .node(node)
+                .unwrap()
+                .fen()
+                .to_owned();
+            assert_no_progress_write(&runner.action(action));
+            assert_eq!(runner.app().analysis_browser.selected_node(), Some(node));
+            assert_eq!(runner.app().analysis_browser.preview_fen(), Some(fen.as_str()));
+            assert_eq!(runner.app().displayed_board(), &Board::from_fen(&fen).unwrap());
+            assert_eq!(attempt_snapshot(runner.app()), before);
+        }
+        // Both a repeated prose label and a repeated tree SAN must have
+        // distinct destinations, independent of the text's byte contents.
+        for label in ["repeat", "h1=N"] {
+            let same_label: Vec<_> = targets
+                .iter()
+                .filter(|(index, _, _)| document.runs[*index].text == label)
+                .collect();
+            assert!(same_label.len() >= 2);
+            assert_ne!(same_label[0].2, same_label[1].2);
+        }
+
+        assert_no_progress_write(&runner.action(action_id(FLIP)));
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        let (first_run, _, first_node) = targets[0];
+        let first_page = pages.iter().position(|page| page.fragments.iter()
+            .any(|fragment| fragment.source_run == first_run && fragment.target.is_some())).unwrap();
+        while runner.app().analysis_browser.page() > first_page {
+            assert_no_progress_write(&runner.page_turn(false));
+        }
+        assert_no_progress_write(&runner.action(action_id(&link_action(epoch, first_run))));
+        let expected = runner.app().puzzles[0].analysis.as_ref().unwrap().node(first_node).unwrap().fen();
+        assert_eq!(runner.app().analysis_browser.preview_fen(), Some(expected));
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_CLOSE)));
+        assert_eq!(runner.app().displayed_board(), &before.board);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+    }
+
+    #[test]
+    fn analysis_rejects_off_page_stale_and_unmarked_actions_without_side_effects() {
+        let (mut runner, _) = runner(Some(rich_with_duplicate_refs_and_nested_variations()));
+        let document = project_analysis(&runner.app().puzzles[0]);
+        let pages = paginate(&document);
+        let before = attempt_snapshot(runner.app());
+        let first = pages[0].fragments.iter().find(|part| part.target.is_some()).unwrap();
+        let last_page = pages.iter().rposition(|page| page.link_count() > 0).unwrap();
+        let last = pages[last_page].fragments.iter().find(|part| part.target.is_some()).unwrap();
+        assert!(last_page > 0);
+        assert_ne!(first.source_run, last.source_run);
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        let epoch = runner.app().analysis_browser.epoch();
+        let first_action = action_id(&link_action(epoch, first.source_run));
+        let last_action = action_id(&link_action(epoch, last.source_run));
+
+        // Neither off-page move nor plain-looking prose nor blank area is
+        // registered as an analysis action. Square and promotion actions
+        // cannot grade or mutate a live board while the reader is open.
+        for action in [
+            last_action,
+            action_id("analysis-link-invalid"),
+            action_id("h1=Q+"),
+            action_id("e2e4"),
+            action_id("blank-space"),
+            action_id(&square_action(square_from_name("h2").unwrap())),
+            action_id(PROMOTE_QUEEN),
+        ] {
+            assert_no_progress_write(&runner.action(action));
+            assert_eq!(runner.app().analysis_browser.selected_node(), None);
+            assert_eq!(attempt_snapshot(runner.app()), before);
+        }
+        assert_no_progress_write(&runner.action(first_action));
+        let selected = runner.app().analysis_browser.selected_node();
+        assert_eq!(selected, first.target);
+        while runner.app().analysis_browser.page() < last_page {
+            assert_no_progress_write(&runner.page_turn(true));
+        }
+        assert_no_progress_write(&runner.action(first_action));
+        assert_eq!(runner.app().analysis_browser.selected_node(), selected);
+        assert_no_progress_write(&runner.action(last_action));
+        assert_eq!(runner.app().analysis_browser.selected_node(), last.target);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_NEXT)));
+        assert_eq!(runner.app().analysis_browser.page(), last_page);
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_CLOSE)));
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
+        assert_ne!(runner.app().analysis_browser.epoch(), epoch);
+        assert_eq!(runner.app().analysis_browser.selected_node(), None);
+        assert_no_progress_write(&runner.action(last_action));
+        assert_eq!(runner.app().analysis_browser.selected_node(), None);
+        assert_eq!(attempt_snapshot(runner.app()), before);
+        assert_no_progress_write(&runner.action(action_id(ANALYSIS_CLOSE)));
+    }
+
+    #[test]
+    fn analysis_link_ids_never_overlap_other_live_controls() {
+        let puzzle = parse_puzzle_file(&rich_with_duplicate_refs_and_nested_variations()).unwrap().puzzles.remove(0);
+        let links: Vec<_> = project_analysis(&puzzle).runs.iter().enumerate()
+            .filter_map(|(index, run)| run.target.map(|_| action_id(&link_action(1, index))))
+            .collect();
+        let mut other = vec![
+            action_id(ANALYSIS_TOGGLE), action_id(ANALYSIS_PREVIOUS), action_id(ANALYSIS_NEXT),
+            action_id(ANALYSIS_CLOSE), action_id(RESET), action_id(FLIP), action_id(EXIT),
+            action_id(MODE_TOGGLE), action_id(ORIENTATION_LOCK), action_id(PUZZLE_PICKER),
+            action_id(PUZZLE_PICKER_CANCEL), action_id(PROMOTE_QUEEN),
+            action_id(PROMOTE_ROOK), action_id(PROMOTE_BISHOP),
+            action_id(PROMOTE_KNIGHT), action_id(PROMOTION_CANCEL),
+        ];
+        other.extend((0..CELLS).map(|square| action_id(&square_action(square))));
+        other.extend((0..10).map(|index| action_id(&collection_action(index))));
+        for link in links {
+            assert!(!other.contains(&link), "analysis action collides with a live control");
+        }
+    }
+
 }
 
 fn main() -> ExitCode {

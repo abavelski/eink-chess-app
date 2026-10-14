@@ -2,6 +2,7 @@
 //! Cobalt silently caps a paragraph at 16 links and 256 style spans.
 
 use crate::analysis::NodeHandle;
+use kobo_sdk::{action_id, ActionId};
 use crate::pgn_projection::{AnalysisDocument, RunOrigin};
 
 // Intentionally conservative: the full-size chessboard is never resized.
@@ -39,11 +40,22 @@ impl AnalysisPage {
             .filter(|fragment| fragment.target.is_some())
             .count()
     }
+
+    /// Only IDs emitted on this page in this reader session may preview a node.
+    /// The semantic handle is still checked against the current validated tree
+    /// by AnalysisBrowser::select; text labels never participate in lookup.
+    pub fn target_for_action(&self, action: ActionId, epoch: u64) -> Option<NodeHandle> {
+        self.fragments.iter().find_map(|fragment| {
+            let target = fragment.target?;
+            (action == action_id(&link_action(epoch, fragment.source_run))).then_some(target)
+        })
+    }
 }
 
-/// Stable link identity across pagination/reflow, distinct for duplicate SANs.
-pub fn link_action(run: usize) -> String {
-    format!("analysis-link-{run}")
+/// Stable during a reading session and distinct for duplicate labels. A new
+/// session gets new IDs so delayed taps from a closed reader cannot be reused.
+pub fn link_action(epoch: u64, run: usize) -> String {
+    format!("analysis-link-{epoch}-{run}")
 }
 
 /// No silent truncation, byte-splitting or repeated semantic links. A page
@@ -260,6 +272,29 @@ mod tests {
             .unwrap()
             .text()
             .ends_with("конец!"));
+    }
+
+    #[test]
+    fn page_action_resolution_rejects_hidden_links_and_old_sessions() {
+        let pages = paginate(&project_analysis(&rich()));
+        let visible = pages
+            .iter()
+            .flat_map(|page| page.fragments.iter())
+            .find(|fragment| fragment.target.is_some())
+            .unwrap();
+        let action = action_id(&link_action(17, visible.source_run));
+        let index = pages
+            .iter()
+            .position(|page| page.fragments.iter().any(|f| f.source_run == visible.source_run && f.target.is_some()))
+            .unwrap();
+        assert_eq!(pages[index].target_for_action(action, 17), visible.target);
+        assert_eq!(pages[index].target_for_action(action, 18), None);
+        for (other, page) in pages.iter().enumerate() {
+            if other != index {
+                assert_eq!(page.target_for_action(action, 17), None);
+            }
+        }
+        assert_eq!(pages[index].target_for_action(action_id("analysis-link-invalid"), 17), None);
     }
 
     #[test]
