@@ -50,7 +50,10 @@ fn parity_rich_fixture_reader_actions_and_grading() {
     assert_eq!(runner.app().displayed_board(), &before.board);
 
     assert_no_progress_write(&play(&mut runner, "h2h1n"));
-    assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Wrong));
+    assert_eq!(
+        runner.app().solution_feedback,
+        Some(SolutionFeedback::Wrong)
+    );
     assert!(!runner.app().current_is_solved());
     let saved = play(&mut runner, "h2h1q");
     assert_eq!(
@@ -129,7 +132,10 @@ fn parity_book_picker_nested_refs_exact_fens_and_main_lines() {
                 .unwrap()
                 .fen();
             assert_eq!(runner.app().analysis_browser.preview_fen(), Some(fen));
-            assert_eq!(runner.app().displayed_board(), &Board::from_fen(fen).unwrap());
+            assert_eq!(
+                runner.app().displayed_board(),
+                &Board::from_fen(fen).unwrap()
+            );
             assert_eq!(attempt_snapshot(runner.app()), before);
         }
         assert_no_progress_write(&runner.action(action_id(ANALYSIS_CLOSE)));
@@ -150,8 +156,14 @@ fn parity_book_picker_nested_refs_exact_fens_and_main_lines() {
     let completed = play(&mut runner, "g1f3");
     assert!(progress_bytes(&completed).is_some());
     assert!(runner.app().current_is_solved());
-    assert!(runner.app().progress.is_solved("puzzles-book.json", "nested-001"));
-    assert!(!runner.app().progress.is_solved(PUZZLES_FILE, "lichess-001cr"));
+    assert!(runner
+        .app()
+        .progress
+        .is_solved("puzzles-book.json", "nested-001"));
+    assert!(!runner
+        .app()
+        .progress
+        .is_solved(PUZZLES_FILE, "lichess-001cr"));
 }
 
 #[test]
@@ -174,7 +186,10 @@ fn parity_unchanged_legacy_files_preserve_board_modes_and_progress() {
         let done = play(&mut runner, "d7e8");
         assert!(progress_bytes(&done).is_some());
         assert!(runner.app().current_is_solved());
-        assert_eq!(runner.app().solution_feedback, Some(SolutionFeedback::Complete));
+        assert_eq!(
+            runner.app().solution_feedback,
+            Some(SolutionFeedback::Complete)
+        );
         assert_eq!(runner.app().puzzles[0].description.as_deref(),
             Some("Solution begins with d7e8.\nFollow the line one move at a time.\nReplay it to practice the idea."));
     }
@@ -182,7 +197,8 @@ fn parity_unchanged_legacy_files_preserve_board_modes_and_progress() {
 
 #[test]
 fn parity_invalid_picker_and_future_progress_never_destroy_active_data() {
-    let invalid = include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/invalid-cycle.json");
+    let invalid =
+        include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/invalid-cycle.json");
     for damaged_progress in [
         b"corrupted".to_vec(),
         br#"{"version":99,"files":{}}"#.to_vec(),
@@ -199,9 +215,17 @@ fn parity_invalid_picker_and_future_progress_never_destroy_active_data() {
         let before = attempt_snapshot(runner.app());
         let commands = switch_collection(&mut runner, "puzzles-invalid.json", invalid);
         assert_no_progress_write(&commands);
-        assert_eq!(runner.app().active_collection.as_deref(), Some(PUZZLES_FILE));
+        assert_eq!(
+            runner.app().active_collection.as_deref(),
+            Some(PUZZLES_FILE)
+        );
         assert_eq!(attempt_snapshot(runner.app()), before);
-        assert!(runner.app().file_error.as_deref().unwrap().contains("puzzles-invalid.json"));
+        assert!(runner
+            .app()
+            .file_error
+            .as_deref()
+            .unwrap()
+            .contains("puzzles-invalid.json"));
         let commands = switch_collection(&mut runner, "puzzles-rich.json", RICH_PUZZLES);
         assert_no_progress_write(&commands);
         assert_eq!(runner.app().puzzles[0].id, "rich-black-promotion");
@@ -309,14 +333,23 @@ fn assert_layout_report(
             .expect("full-size board on every screen")
             .rect;
         for name in [MODE_TOGGLE, ORIENTATION_LOCK, RESET, FLIP, PUZZLE_PICKER] {
-            assert!(diagnostics.layout.nodes.iter().any(
-                |node| node.kind.acts_on() == Some(action_id(name))
-            ));
+            assert!(diagnostics
+                .layout
+                .nodes
+                .iter()
+                .any(|node| node.kind.acts_on() == Some(action_id(name))));
         }
-        for forbidden in ["description-toggle", "note-toggle", "game-review", "settings"] {
-            assert!(!diagnostics.layout.nodes.iter().any(
-                |node| node.kind.acts_on() == Some(action_id(forbidden))
-            ));
+        for forbidden in [
+            "description-toggle",
+            "note-toggle",
+            "game-review",
+            "settings",
+        ] {
+            assert!(!diagnostics
+                .layout
+                .nodes
+                .iter()
+                .any(|node| node.kind.acts_on() == Some(action_id(forbidden))));
         }
         eprintln!(
             "PARITY_LAYOUT fixture={fixture} state={state} display={}x{} board={board:?} issues=0",
