@@ -67,6 +67,37 @@ either icon. Completed puzzle IDs are stored
 separately in `progress.v1`; uploaded puzzle JSON files are never modified.
 The old `positions.fen` file is no longer read.
 
+### Kindle/Kobo puzzle parity
+
+The app accepts the **same version-1 Kindle JSON bytes** as the pinned
+[Kindle puzzle contract](docs/PUZZLE_FORMAT.md), without converting or rewriting
+uploaded files. Alongside legacy `fen`, `solution`, and `description`,
+collections may contain `topic`, `description_content` structured text
+and move-reference spans, source metadata, and a validated additive
+`analysis.version: 1` tree with main lines and nested variations.
+The normal board shows a nonblank `topic` instead of the side-to-move status;
+`solution` remains the **only** graded move sequence.
+
+The book icon opens **Analysis**, an annotated read-only document with linked
+moves, explicit references, and paginated variations. Selecting a move previews
+its exact stored FEN on the **normal full-size board**; closing returns to the
+unchanged solution attempt. Reader navigation does not mark puzzles solved or
+save progress. Legacy plain descriptions remain readable in Analysis; the
+solution completion screen reveals plain-text descriptions. There is **no NOTE
+button**, game-review picker, small board, or additional settings panel.
+
+Each collection has an **8 MiB raw-byte cap** (including 8 MiB itself). Files
+over the old **256 KiB** Cobalt store limit need the read-only, 64 KiB range
+provider installed by `scripts/prepare_cobalt.py` in the **pinned Cobalt
+runtime** and a freshly rebuilt/deployed `kobod`. A stock Cobalt runtime
+cannot load larger books; a single 8 MiB store frame is not used. Uploaded
+collections remain read-only, and `progress.v1` separately records active
+filename, per-file current puzzle ID, and solved IDs. Invalid picker selections
+keep the current collection; corrupt/future progress is never silently replaced.
+
+Run the reproducible [host parity/release gates](docs/KINDLE_PARITY_HOST_GATE.md)
+before the [physical device checkpoint](tasks/kindle-puzzle-parity/09-physical-device-checkpoint.md).
+
 ## Architecture
 
 ```text
