@@ -689,8 +689,13 @@ impl ChessBoardApp {
                                     [(ANALYSIS_TOGGLE, "Open Analysis", Glyph::Book, false)],
                                 )
                             } else {
-                                slot.button_with_state(
-                                    ANALYSIS_TOGGLE, "Analysis", ControlState::Disabled
+                                // Cobalt aligns icon-only bands with the chess
+                                // frame; a disabled Button would break alignment.
+                                // This No-analysis cell is inert by the app's
+                                // on_action guard and marked as unavailable.
+                                slot.controls_with_selection(
+                                    1,
+                                    [(ANALYSIS_TOGGLE, "Analysis unavailable", Glyph::Circle, false)],
                                 )
                             }
                         }) as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
@@ -1928,7 +1933,7 @@ mod tests {
         runner.app_mut().puzzles[0].description_content.clear();
         let d = runner.app().screen().diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
         assert!(d.layout.nodes.iter().any(|node| matches!(
-            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Disabled, _)
+            node.kind, kobo_sdk::LayoutKind::Cell(id, _, false)
             if id == action_id(ANALYSIS_TOGGLE)
         )));
         runner.action(action_id(ANALYSIS_TOGGLE));
