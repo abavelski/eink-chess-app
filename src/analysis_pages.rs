@@ -8,6 +8,8 @@ use crate::pgn_projection::{AnalysisDocument, RunOrigin};
 pub const PAGE_CHARS: usize = 64;
 pub const PAGE_NEWLINES: usize = 1;
 pub const PAGE_LINKS: usize = 3;
+/// Bound unbreakable words without inserting invisible characters into prose.
+pub const PAGE_WORD_CHARS: usize = 28;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PageFragment {
@@ -46,6 +48,7 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
     let mut used = 0;
     let mut newlines = 0;
     let mut links = 0;
+    let mut unbroken = 0;
 
     for (source_run, run) in document.runs.iter().enumerate() {
         let mut remaining = run.text.as_str();
@@ -67,14 +70,17 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
                 used = 0;
                 newlines = 0;
                 links = 0;
+                unbroken = 0;
             }
 
             let mut end = 0;
             let mut count = 0;
             let mut breaks = 0;
+            let mut word = unbroken;
             for (offset, ch) in remaining.char_indices() {
                 if used + count == PAGE_CHARS
                     || (ch == '\n' && newlines + breaks == PAGE_NEWLINES)
+                    || (!ch.is_whitespace() && word == PAGE_WORD_CHARS)
                 {
                     break;
                 }
@@ -82,6 +88,7 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
                 if ch == '\n' {
                     breaks += 1;
                 }
+                if ch.is_whitespace() { word = 0; } else { word += 1; }
                 end = offset + ch.len_utf8();
             }
             if end == 0 {
@@ -91,6 +98,7 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
                 used = 0;
                 newlines = 0;
                 links = 0;
+                unbroken = 0;
                 continue;
             }
 
@@ -105,6 +113,7 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
             }
             used += count;
             newlines += breaks;
+            unbroken = word;
             target = None;
             remaining = &remaining[end..];
             if !remaining.is_empty() {
@@ -112,6 +121,7 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
                 used = 0;
                 newlines = 0;
                 links = 0;
+                unbroken = 0;
             }
         }
     }
@@ -139,6 +149,8 @@ mod tests {
         assert!(pages.iter().all(|page| page.link_count() <= PAGE_LINKS));
         assert!(pages.iter().all(|page| page.fragments.iter().map(|f| f.text.chars().count()).sum::<usize>() <= PAGE_CHARS));
         assert!(pages.iter().all(|page| page.text().matches('\n').count() <= PAGE_NEWLINES));
+        assert!(pages.iter().all(|page| page.text().split(char::is_whitespace)
+            .all(|word| word.chars().count() <= PAGE_WORD_CHARS)));
         let actual: Vec<_> = pages.iter().flat_map(|page| page.fragments.iter())
             .filter(|fragment| fragment.target.is_some())
             .map(|fragment| (fragment.source_run, fragment.target))

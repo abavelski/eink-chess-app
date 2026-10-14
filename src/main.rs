@@ -672,15 +672,11 @@ impl ChessBoardApp {
                         SlotWidth::Fixed(130),
                         Box::new(move |slot| {
                             if analysis_available {
-                                slot.controls_with_selection(
-                                    1,
-                                    [(
-                                        ANALYSIS_TOGGLE,
-                                        if analysis_open { "Close Analysis" } else { "Open Analysis" },
-                                        Glyph::Book,
-                                        analysis_open,
-                                    )],
-                                )
+                                if analysis_open {
+                                    slot.primary_button(ANALYSIS_TOGGLE, "Analysis ON")
+                                } else {
+                                    slot.button(ANALYSIS_TOGGLE, "Analysis")
+                                }
                             } else {
                                 slot.button_with_state(
                                     ANALYSIS_TOGGLE, "Analysis", ControlState::Disabled
@@ -1921,7 +1917,8 @@ mod tests {
             .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
             .unwrap().rect, old_board);
         assert!(layout.layout.nodes.iter().any(|node| matches!(
-            node.kind, kobo_sdk::LayoutKind::Cell(id, _, true) if id == action_id(ANALYSIS_TOGGLE)
+            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Enabled, kobo_sdk::Emphasis::Primary)
+                if id == action_id(ANALYSIS_TOGGLE)
         )));
         assert!(opened.nodes.iter().any(|node| matches!(node, kobo_sdk::Node::RichText { .. })));
         for name in [ANALYSIS_PREVIOUS, ANALYSIS_NEXT, ANALYSIS_CLOSE] {
@@ -1934,7 +1931,8 @@ mod tests {
             .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
             .unwrap().rect, old_board);
         assert!(closed.layout.nodes.iter().any(|node| matches!(
-            node.kind, kobo_sdk::LayoutKind::Cell(id, _, false) if id == action_id(ANALYSIS_TOGGLE)
+            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Enabled, kobo_sdk::Emphasis::Normal)
+                if id == action_id(ANALYSIS_TOGGLE)
         )));
     }
 
