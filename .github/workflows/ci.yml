@@ -10,10 +10,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85.1
-      - name: Test
+        with:
+          components: rustfmt
+      - name: Test legacy and unchanged Kindle parity corpus
         run: cargo test
-      - name: Format
+      - name: Check Rust formatting
         run: cargo fmt --all -- --check
+      - name: Check included Task 08 harness formatting
+        run: rustfmt --edition 2021 --check src/parity_integration_tests.rs
+      - name: Generate and check deterministic Kobo layout report
+        run: |
+          set -o pipefail
+          cargo test parity_layout_report_for_task_09 -- --nocapture 2>&1 | tee parity-layout-report.txt
+          grep -q 'PARITY_LAYOUT fixture=kindle-book' parity-layout-report.txt
+          grep -q 'PARITY_LAYOUT fixture=kobo-legacy' parity-layout-report.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-layout-report
+          path: parity-layout-report.txt
+          if-no-files-found: ignore
 
   cobalt-range-provider:
     runs-on: ubuntu-latest
@@ -25,17 +41,25 @@ jobs:
           repository: abavelski/Cobalt
           ref: ff4ec9950e178243807082bf818e42c8538d080e
           path: cobalt
-      - name: Patch pinned Cobalt idempotently
+      - name: Patch pinned Cobalt and verify reproducible package
         run: |
           python3 -m py_compile scripts/cobalt_collection_range.py scripts/prepare_cobalt.py
-          python3 - <<'PY'
-          from pathlib import Path
-          from scripts.cobalt_collection_range import install
-          for _ in range(2):
-              install(Path("cobalt"))
-          PY
-      - name: Test actual Cobalt range provider and host simulator
+          python3 scripts/prepare_cobalt.py cobalt
+          git -C cobalt diff --binary > /tmp/first-cobalt.patch
+          find cobalt/examples/eink-chess -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/first-package.sha256
+          python3 scripts/prepare_cobalt.py cobalt
+          git -C cobalt diff --binary > /tmp/second-cobalt.patch
+          find cobalt/examples/eink-chess -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/second-package.sha256
+          cmp /tmp/first-cobalt.patch /tmp/second-cobalt.patch
+          cmp /tmp/first-package.sha256 /tmp/second-package.sha256
+          test -f cobalt/examples/eink-chess/src/analysis_browser.rs
+          test -f cobalt/examples/eink-chess/src/parity_integration_tests.rs
+          cmp tests/fixtures/kindle-parity/pgn-converter/valid-book.json cobalt/examples/eink-chess/tests/fixtures/kindle-parity/pgn-converter/valid-book.json
+          cmp tests/fixtures/kindle-parity/rich-analysis/valid-rich.json cobalt/examples/eink-chess/tests/fixtures/kindle-parity/rich-analysis/valid-rich.json
+      - name: Test real pinned Cobalt provider and packaged app
         run: |
           cargo test --manifest-path cobalt/Cargo.toml -p kobo-policy eink_chess_collection_range
           cargo test --manifest-path cobalt/Cargo.toml -p kobod --bin kobod
+          cargo test --manifest-path cobalt/Cargo.toml -p kobo-eink-chess
+          cargo check --manifest-path cobalt/Cargo.toml -p kobo-eink-chess
           cargo check --manifest-path cobalt/Cargo.toml -p kobod --features device-write
