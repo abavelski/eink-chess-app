@@ -49,16 +49,16 @@ current app.
 | --- | --- | --- |
 | `id` | Yes | A nonempty string, unique within the file. |
 | `fen` | Yes | The complete six-field FEN at the moment the solver should move. |
-| `description` | No | An explanation displayed below the board and toolbar after solving or when the description toggle is active. Use `\n` for line breaks. May be omitted, empty, or `null`. |
-| `topic` | No | Optional UTF-8 string (including newlines); null or non-string is ignored. Rich metadata only; not yet shown in the UI. |
-| `description_content` | No | Strict structured text spans for later analysis rendering; omitted means plain description fallback. |
-| `analysis` | No | Version-1 validated analysis tree with ordered branches; ignored for grading. |
+| `description` | No | An explanation displayed below the board and toolbar after solving; available in the read-only Analysis view beforehand. Use `\n` for line breaks. May be omitted, empty, or `null`. |
+| `topic` | No | Optional UTF-8 string (including newlines) shown as the Solution status in place of the side-to-move label. Blank strings fall back to the turn label; null or non-string is ignored. |
+| `description_content` | No | Strict structured text spans used in the Analysis reader, falling back to plain description when omitted. |
+| `analysis` | No | Version-1 validated tree whose branches and references are browsable in Analysis, never used for grading. |
 | `difficulty` | No | A string or number shown in parentheses after the puzzle ID in the header, for example `"Hard"` or `4`. May be omitted or `null`. |
 | `solution` | Yes | A nonempty array of UCI moves, beginning with the solver's move and including alternating opponent replies. |
 | `source` | No | Optional provenance URL, ignored by the current app. |
 
 
-## Optional rich analysis (phase-two parser)
+## Additive version-1 rich analysis and reader
 
 Legacy version-1 collections remain valid and require no changes. The app now
 validates and retains optional rich metadata from the pinned Kindle additive-v1
@@ -92,10 +92,37 @@ and, when provided, must be nonnegative integers. The reader validates
 FEN/UCI syntax but deliberately does not validate move legality.
 
 The parser enforces **8 MiB (8,388,608 raw bytes)** independently of the
-Kobo collection loader. Larger books require the Cobalt range adapter
-described above; parser acceptance alone does not guarantee device loading.
+Kobo collection loader. Books over 256 KiB (through 8 MiB inclusive) require
+the patched and rebuilt Cobalt range adapter described above; parser acceptance
+alone does not guarantee device loading. The adapter reads verified 64 KiB
+chunks instead of trying to send a full 8 MiB JSON file in one store frame.
 The normative format is the
 [pin at 80eaf892](https://github.com/abavelski/kindle-chess-puzzles/blob/80eaf892fe0c7a96e3ba603e25ee3af57e3d93c8/docs/PUZZLE_FORMAT.md#phase-two-rich-analysis-extension).
+
+## Analysis controls and document projection
+
+The **Analysis** book icon lives in the existing board toolbar slot, without
+shrinking the chessboard or adding settings. It opens a read-only PGN-like
+document from the original Kindle JSON: description/preface spans, root content,
+move numbers, SAN moves, nested parenthesized variations, comments, and authored
+`move_ref` spans. Text spans remain plain text even when they look like SAN
+or UCI moves. Only actual tree moves and explicit move references are clickable.
+Move references use their exact authored labels when present; otherwise the
+target node's SAN is shown. Duplicate visible labels still navigate to their
+distinct underlying node IDs.
+
+Select a linked move to preview its **exact stored post-move FEN** on the normal
+board. The highlighted link indicates the selected node; no moves are played
+on the solver's actual board, and alternate moves never count as correct answers.
+Use the **Previous**/**Next** analysis icons (or page-turn keys) to read a
+long document, and **Close Analysis** to restore the live board and attempt.
+The reader paginates link and style runs below Cobalt's per-paragraph limits.
+Opening, browsing, previewing and closing Analysis do not write `progress.v1`.
+
+A legacy puzzle with a description but no tree still offers a plain reader;
+a puzzle with neither a description nor an analysis tree has an unavailable
+Analysis control. In **Free board**, Analysis is unavailable. There is no game
+review picker, miniature board, NOTE button, or extra settings panel.
 
 ## Whose turn and board orientation
 
@@ -122,23 +149,25 @@ uses the king's move, such as `e1g1`.
 
 For a two-move solution, the array normally contains the solver's first move,
 the opponent's reply, and the solver's second move. The file represents one graded
-main solution line. Optional rich analysis supports browse-only branches as
-parser data, but the Kobo UI does not yet expose them.
+main solution line. Optional rich analysis supports browse-only branches and
+explicit move references in the Kobo **Analysis** reader.
 
-The app validates FENs and move notation, displays the turn,
+The app validates FENs and move notation, displays a nonblank authored `topic`
+(or the side-to-move label when no topic is supplied),
 and uses the solution as an exact move sequence. The user enters only the solver
 plies (indexes 0, 2, 4, ...). A correct solver move is kept, the following stored
 opponent ply is applied automatically, and the app then waits for the next
 solver move. A wrong move is restored immediately and does not advance the
 solution. A correct intermediate move adds **Correct** to the turn line.
 Finishing the sequence shows a centered thumbs up over the board; an incorrect
-move shows a thumbs down. Completing the solution also reveals its optional
-description below the board and toolbar. Reset, changing puzzles, or entering
-Free board hides the description. The note icon below the board toggles the
-description on or off at any time, including before solving and in Free board.
-Its gray fill indicates that visibility is on. Revealing the description does
-not advance the solution or mark the puzzle as solved. Reset removes the result
-icon.
+move shows a thumbs down. Completing the solution also reveals its optional plain-text description
+below the board and toolbar. Structured `description_content` is projected to
+plain text there, with move references displayed as authored labels (or target SAN).
+Reset, changing puzzles, or entering Free board hides the description. There is
+**no NOTE icon or description toggle**: before solving, descriptions and
+annotated lines are read in **Analysis**. Opening Analysis never advances or
+grades the solution, writes progress, or changes the live attempt. Reset removes
+the result icon.
 
 This is solution matching, not general chess-rule enforcement: the app still
 does not decide whether an ordinary move is legal, whether a king is in check,
@@ -164,11 +193,12 @@ while Free board is active.
 
 At startup the app lists keys matching `puzzles.json` or
 `puzzles-<name>.json`, sorts them by filename, and reads their metadata for the
-picker. If valid, `puzzles.json` is the preferred initial collection;
+picker. Books over 256 KiB are initially shown by filename: their title and
+full validation are deferred until a bounded full read on selection. If valid, `puzzles.json` is the preferred initial collection;
 otherwise the first valid discovered collection is used.
 
-Press **Puzzles** to switch collections. A successful switch opens the selected
-file at its first puzzle. If a selected file is missing, unreadable, or invalid,
+Press **Puzzles** to switch collections. A successful switch opens the last
+remembered puzzle ID in that file, or its first puzzle when there is no match. If a selected file is missing, unreadable, or invalid,
 the current collection and board stay active and an error names the file that
 failed. Uploaded files are never rewritten just because parsing failed.
 
