@@ -3637,6 +3637,7 @@ mod tests {
             );
         }
     }
+    include!("parity_integration_tests.rs");
 }
 
 fn main() -> ExitCode {
