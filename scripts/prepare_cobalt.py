@@ -62,8 +62,19 @@ install_collection_range(COBALT)
 
 destination = COBALT / "examples" / "eink-chess"
 (destination / "src").mkdir(parents=True, exist_ok=True)
-for name in ("main.rs", "board.rs", "progress.rs", "puzzle.rs", "large_collection.rs"):
-    shutil.copy2(APP / "src" / name, destination / "src" / name)
+# Copy the complete Rust app, including analysis modules and the Task 08
+# simulator harness. The old five-file allowlist omitted required modules.
+for source in sorted((APP / "src").glob("*.rs")):
+    shutil.copy2(source, destination / "src" / source.name)
+
+# Unit tests in those modules use unchanged Kindle corpus files via
+# include_bytes!("../tests/fixtures/..."). Keep the same relative paths in
+# the prepared Cobalt workspace; do not regenerate or reserialize fixture JSON.
+shutil.copytree(
+    APP / "tests" / "fixtures",
+    destination / "tests" / "fixtures",
+    dirs_exist_ok=True,
+)
 main = destination / "src" / "main.rs"
 main.write_text(
     main.read_text().replace(
