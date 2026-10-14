@@ -27,11 +27,17 @@ pub struct AnalysisPage {
 
 impl AnalysisPage {
     pub fn text(&self) -> String {
-        self.fragments.iter().map(|fragment| fragment.text.as_str()).collect()
+        self.fragments
+            .iter()
+            .map(|fragment| fragment.text.as_str())
+            .collect()
     }
 
     pub fn link_count(&self) -> usize {
-        self.fragments.iter().filter(|fragment| fragment.target.is_some()).count()
+        self.fragments
+            .iter()
+            .filter(|fragment| fragment.target.is_some())
+            .count()
     }
 }
 
@@ -55,12 +61,12 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
         let mut target = run.target;
         while !remaining.is_empty() {
             let front: String = remaining.chars().take(PAGE_CHARS + 1).collect();
-            let fits_whole = front.chars().count() <= PAGE_CHARS
-                && front.len() == remaining.len();
+            let fits_whole = front.chars().count() <= PAGE_CHARS && front.len() == remaining.len();
             let extra_newlines = front.chars().filter(|ch| *ch == '\n').count();
             if used == PAGE_CHARS
                 || (target.is_some() && links == PAGE_LINKS)
-                || (target.is_some() && fits_whole
+                || (target.is_some()
+                    && fits_whole
                     && (front.chars().count() > PAGE_CHARS - used
                         || newlines + extra_newlines > PAGE_NEWLINES))
             {
@@ -88,7 +94,11 @@ pub fn paginate(document: &AnalysisDocument) -> Vec<AnalysisPage> {
                 if ch == '\n' {
                     breaks += 1;
                 }
-                if ch.is_whitespace() { word = 0; } else { word += 1; }
+                if ch.is_whitespace() {
+                    word = 0;
+                } else {
+                    word += 1;
+                }
                 end = offset + ch.len_utf8();
             }
             if end == 0 {
@@ -138,24 +148,45 @@ mod tests {
     use crate::puzzle::parse_puzzle_file;
 
     fn rich() -> crate::puzzle::Puzzle {
-        parse_puzzle_file(include_bytes!("../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json"))
-            .unwrap().puzzles.remove(0)
+        parse_puzzle_file(include_bytes!(
+            "../tests/fixtures/kindle-parity/rich-analysis/valid-rich.json"
+        ))
+        .unwrap()
+        .puzzles
+        .remove(0)
     }
 
     fn assert_lossless(document: &AnalysisDocument) {
         let pages = paginate(document);
         assert!(!pages.is_empty());
-        assert_eq!(pages.iter().map(AnalysisPage::text).collect::<String>(), document.text());
+        assert_eq!(
+            pages.iter().map(AnalysisPage::text).collect::<String>(),
+            document.text()
+        );
         assert!(pages.iter().all(|page| page.link_count() <= PAGE_LINKS));
-        assert!(pages.iter().all(|page| page.fragments.iter().map(|f| f.text.chars().count()).sum::<usize>() <= PAGE_CHARS));
-        assert!(pages.iter().all(|page| page.text().matches('\n').count() <= PAGE_NEWLINES));
-        assert!(pages.iter().all(|page| page.text().split(char::is_whitespace)
+        assert!(pages.iter().all(|page| page
+            .fragments
+            .iter()
+            .map(|f| f.text.chars().count())
+            .sum::<usize>()
+            <= PAGE_CHARS));
+        assert!(pages
+            .iter()
+            .all(|page| page.text().matches('\n').count() <= PAGE_NEWLINES));
+        assert!(pages.iter().all(|page| page
+            .text()
+            .split(char::is_whitespace)
             .all(|word| word.chars().count() <= PAGE_WORD_CHARS)));
-        let actual: Vec<_> = pages.iter().flat_map(|page| page.fragments.iter())
+        let actual: Vec<_> = pages
+            .iter()
+            .flat_map(|page| page.fragments.iter())
             .filter(|fragment| fragment.target.is_some())
             .map(|fragment| (fragment.source_run, fragment.target))
             .collect();
-        let expected: Vec<_> = document.runs.iter().enumerate()
+        let expected: Vec<_> = document
+            .runs
+            .iter()
+            .enumerate()
             .filter(|(_, run)| run.target.is_some())
             .map(|(index, run)| (index, run.target))
             .collect();
@@ -173,14 +204,20 @@ mod tests {
         let tree = puzzle.analysis.as_ref().unwrap();
         let target = tree.node(tree.root()).unwrap().children()[0];
         let mut runs = vec![AnalysisRun {
-            text: "Черные начинают — ".into(), origin: RunOrigin::Prose, target: None
+            text: "Черные начинают — ".into(),
+            origin: RunOrigin::Prose,
+            target: None,
         }];
         for i in 0..330 {
             runs.push(AnalysisRun {
-                text: format!("e4{i}"), origin: RunOrigin::ExplicitMoveRef, target: Some(target)
+                text: format!("e4{i}"),
+                origin: RunOrigin::ExplicitMoveRef,
+                target: Some(target),
             });
             runs.push(AnalysisRun {
-                text: " ".into(), origin: RunOrigin::Prose, target: None
+                text: " ".into(),
+                origin: RunOrigin::Prose,
+                target: None,
             });
         }
         let document = AnalysisDocument { runs };
@@ -193,14 +230,36 @@ mod tests {
         let puzzle = rich();
         let tree = puzzle.analysis.as_ref().unwrap();
         let target = tree.node(tree.root()).unwrap().children()[0];
-        let document = AnalysisDocument { runs: vec![
-            AnalysisRun { text: "Я".repeat(900), origin: RunOrigin::Prose, target: None },
-            AnalysisRun { text: "\n\nПривет ♞\n".into(), origin: RunOrigin::Prose, target: None },
-            AnalysisRun { text: "длинная_ссылка_♞".repeat(30), origin: RunOrigin::ExplicitMoveRef, target: Some(target) },
-            AnalysisRun { text: " конец!".into(), origin: RunOrigin::Prose, target: None },
-        ]};
+        let document = AnalysisDocument {
+            runs: vec![
+                AnalysisRun {
+                    text: "Я".repeat(900),
+                    origin: RunOrigin::Prose,
+                    target: None,
+                },
+                AnalysisRun {
+                    text: "\n\nПривет ♞\n".into(),
+                    origin: RunOrigin::Prose,
+                    target: None,
+                },
+                AnalysisRun {
+                    text: "длинная_ссылка_♞".repeat(30),
+                    origin: RunOrigin::ExplicitMoveRef,
+                    target: Some(target),
+                },
+                AnalysisRun {
+                    text: " конец!".into(),
+                    origin: RunOrigin::Prose,
+                    target: None,
+                },
+            ],
+        };
         assert_lossless(&document);
-        assert!(paginate(&document).last().unwrap().text().ends_with("конец!"));
+        assert!(paginate(&document)
+            .last()
+            .unwrap()
+            .text()
+            .ends_with("конец!"));
     }
 
     #[test]

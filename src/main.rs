@@ -417,11 +417,17 @@ impl ChessBoardApp {
 
     fn analysis_available(&self) -> bool {
         self.mode == BoardMode::Solution
-            && self.puzzles.get(self.puzzle_index)
+            && self
+                .puzzles
+                .get(self.puzzle_index)
                 .is_some_and(|puzzle| analysis_text(puzzle).available())
     }
 
-    fn analysis_page(screen: ScreenBuilder, page: &AnalysisPage, selected: Option<NodeHandle>) -> ScreenBuilder {
+    fn analysis_page(
+        screen: ScreenBuilder,
+        page: &AnalysisPage,
+        selected: Option<NodeHandle>,
+    ) -> ScreenBuilder {
         let mut text = String::new();
         let mut spans = Vec::new();
         let mut links = Vec::new();
@@ -653,11 +659,24 @@ impl ChessBoardApp {
         let orientation_locked = self.orientation_locked;
         let analysis_open = self.analysis_browser.is_open();
         let analysis_available = self.analysis_available();
-        let analysis_pages = if analysis_open { self.analysis_pages() } else { Vec::new() };
-        let analysis_position = self.analysis_browser.page().min(analysis_pages.len().saturating_sub(1));
+        let analysis_pages = if analysis_open {
+            self.analysis_pages()
+        } else {
+            Vec::new()
+        };
+        let analysis_position = self
+            .analysis_browser
+            .page()
+            .min(analysis_pages.len().saturating_sub(1));
         let title = if analysis_open {
-            format!("{title} · Analysis {}/{}", analysis_position + 1, analysis_pages.len())
-        } else { title };
+            format!(
+                "{title} · Analysis {}/{}",
+                analysis_position + 1,
+                analysis_pages.len()
+            )
+        } else {
+            title
+        };
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
@@ -677,7 +696,12 @@ impl ChessBoardApp {
                                 slot.controls_with_selection(
                                     4,
                                     [
-                                        (ANALYSIS_PREVIOUS, "Previous analysis page", Glyph::Previous, false),
+                                        (
+                                            ANALYSIS_PREVIOUS,
+                                            "Previous analysis page",
+                                            Glyph::Previous,
+                                            false,
+                                        ),
                                         (ANALYSIS_TOGGLE, "Analysis active", Glyph::Book, true),
                                         (ANALYSIS_NEXT, "Next analysis page", Glyph::Next, false),
                                         (ANALYSIS_CLOSE, "Close analysis", Glyph::Close, false),
@@ -695,10 +719,16 @@ impl ChessBoardApp {
                                 // on_action guard and marked as unavailable.
                                 slot.controls_with_selection(
                                     1,
-                                    [(ANALYSIS_TOGGLE, "Analysis unavailable", Glyph::Circle, false)],
+                                    [(
+                                        ANALYSIS_TOGGLE,
+                                        "Analysis unavailable",
+                                        Glyph::Circle,
+                                        false,
+                                    )],
                                 )
                             }
-                        }) as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
+                        })
+                            as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
                         // Four original 10 mm controls and right alignment.
@@ -737,9 +767,8 @@ impl ChessBoardApp {
             );
             if analysis_open {
                 if let Some(content) = analysis_pages.get(analysis_position) {
-                    screen = Self::analysis_page(
-                        screen, content, self.analysis_browser.selected_node()
-                    );
+                    screen =
+                        Self::analysis_page(screen, content, self.analysis_browser.selected_node());
                 }
             } else {
                 screen = screen.secondary(view.status);
@@ -1885,41 +1914,77 @@ mod tests {
         assert!(!has_description(runner.app()));
     }
 
-
     #[test]
     fn visible_analysis_has_selected_state_and_preserves_the_original_board() {
         let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
         let metrics = runner.context().metrics();
-        let before = runner.app().screen().diagnostics(&metrics, &Chrome::measuring(false));
-        let old_board = before.layout.nodes.iter()
+        let before = runner
+            .app()
+            .screen()
+            .diagnostics(&metrics, &Chrome::measuring(false));
+        let old_board = before
+            .layout
+            .nodes
+            .iter()
             .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
-            .unwrap().rect;
+            .unwrap()
+            .rect;
         for name in [ANALYSIS_TOGGLE, MODE_TOGGLE, ORIENTATION_LOCK, RESET, FLIP] {
-            assert!(before.layout.nodes.iter().any(|node| node.kind.acts_on() == Some(action_id(name))));
+            assert!(before
+                .layout
+                .nodes
+                .iter()
+                .any(|node| node.kind.acts_on() == Some(action_id(name))));
         }
-        assert!(!before.layout.nodes.iter().any(|node| {
-            node.kind.acts_on() == Some(action_id("description-toggle"))
-        }));
+        assert!(!before
+            .layout
+            .nodes
+            .iter()
+            .any(|node| { node.kind.acts_on() == Some(action_id("description-toggle")) }));
         runner.action(action_id(ANALYSIS_TOGGLE));
         assert!(runner.app().analysis_browser.is_open());
         let opened = runner.app().screen();
         let layout = opened.diagnostics(&metrics, &Chrome::measuring(false));
-        assert_eq!(layout.layout.nodes.iter()
-            .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
-            .unwrap().rect, old_board);
+        assert_eq!(
+            layout
+                .layout
+                .nodes
+                .iter()
+                .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+                .unwrap()
+                .rect,
+            old_board
+        );
         assert!(layout.layout.nodes.iter().any(|node| matches!(
             node.kind, kobo_sdk::LayoutKind::Cell(id, _, true) if id == action_id(ANALYSIS_TOGGLE)
         )));
-        assert!(opened.nodes.iter().any(|node| matches!(node, kobo_sdk::Node::RichText { .. })));
+        assert!(opened
+            .nodes
+            .iter()
+            .any(|node| matches!(node, kobo_sdk::Node::RichText { .. })));
         for name in [ANALYSIS_PREVIOUS, ANALYSIS_NEXT, ANALYSIS_CLOSE] {
-            assert!(layout.layout.nodes.iter().any(|node| node.kind.acts_on() == Some(action_id(name))));
+            assert!(layout
+                .layout
+                .nodes
+                .iter()
+                .any(|node| node.kind.acts_on() == Some(action_id(name))));
         }
         runner.action(action_id(ANALYSIS_CLOSE));
         assert!(!runner.app().analysis_browser.is_open());
-        let closed = runner.app().screen().diagnostics(&metrics, &Chrome::measuring(false));
-        assert_eq!(closed.layout.nodes.iter()
-            .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
-            .unwrap().rect, old_board);
+        let closed = runner
+            .app()
+            .screen()
+            .diagnostics(&metrics, &Chrome::measuring(false));
+        assert_eq!(
+            closed
+                .layout
+                .nodes
+                .iter()
+                .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+                .unwrap()
+                .rect,
+            old_board
+        );
         assert!(closed.layout.nodes.iter().any(|node| matches!(
             node.kind, kobo_sdk::LayoutKind::Cell(id, _, false) if id == action_id(ANALYSIS_TOGGLE)
         )));
@@ -1931,15 +1996,19 @@ mod tests {
         runner.app_mut().puzzles[0].analysis = None;
         runner.app_mut().puzzles[0].description = None;
         runner.app_mut().puzzles[0].description_content.clear();
-        let d = runner.app().screen().diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        let d = runner
+            .app()
+            .screen()
+            .diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
         assert!(d.layout.nodes.iter().any(|node| matches!(
             node.kind, kobo_sdk::LayoutKind::Cell(id, _, false)
             if id == action_id(ANALYSIS_TOGGLE)
         )));
         runner.action(action_id(ANALYSIS_TOGGLE));
         assert!(!runner.app().analysis_browser.is_open());
-        runner.app_mut().puzzles[0].description_content =
-            vec![crate::analysis::ContentSpan::Text("Legacy description".into())];
+        runner.app_mut().puzzles[0].description_content = vec![crate::analysis::ContentSpan::Text(
+            "Legacy description".into(),
+        )];
         runner.action(action_id(ANALYSIS_TOGGLE));
         assert!(runner.app().analysis_browser.is_open());
         assert!(runner.app().analysis_browser.preview_board().is_none());
@@ -1975,23 +2044,38 @@ mod tests {
             let screen = runner.app().screen();
             for metrics in [metrics, libra_h2o] {
                 let diagnostics = screen.diagnostics(&metrics, &Chrome::measuring(false));
-                assert!(!diagnostics.has_errors(), "page {destination}, {metrics:?}: {:?}", diagnostics.issues);
+                assert!(
+                    !diagnostics.has_errors(),
+                    "page {destination}, {metrics:?}: {:?}",
+                    diagnostics.issues
+                );
             }
             assert!(screen.nodes.len() <= 512);
             for node in &screen.nodes {
                 if let kobo_sdk::Node::RichText { spans, links, .. } = node {
                     assert!(spans.len() <= 256 && links.len() <= 16);
                     if let Some(link) = links.first() {
-                        assert!(node_as_rich_text_has_utf8_boundaries(node, link.start, link.end));
+                        assert!(node_as_rich_text_has_utf8_boundaries(
+                            node, link.start, link.end
+                        ));
                     }
                 }
             }
         }
-        let (run_index, target) = document.runs.iter().enumerate()
-            .find_map(|(index, run)| run.target.map(|target| (index, target))).unwrap();
-        let target_page = pages.iter().position(|page| page.fragments.iter().any(|fragment| {
-            fragment.source_run == run_index && fragment.target == Some(target)
-        })).unwrap();
+        let (run_index, target) = document
+            .runs
+            .iter()
+            .enumerate()
+            .find_map(|(index, run)| run.target.map(|target| (index, target)))
+            .unwrap();
+        let target_page = pages
+            .iter()
+            .position(|page| {
+                page.fragments.iter().any(|fragment| {
+                    fragment.source_run == run_index && fragment.target == Some(target)
+                })
+            })
+            .unwrap();
         while runner.app().analysis_browser.page() > target_page {
             runner.action(action_id(ANALYSIS_PREVIOUS));
         }
@@ -2008,7 +2092,11 @@ mod tests {
         assert_eq!(attempt_snapshot(runner.app()), before);
     }
 
-    fn node_as_rich_text_has_utf8_boundaries(node: &kobo_sdk::Node, start: usize, end: usize) -> bool {
+    fn node_as_rich_text_has_utf8_boundaries(
+        node: &kobo_sdk::Node,
+        start: usize,
+        end: usize,
+    ) -> bool {
         matches!(node, kobo_sdk::Node::RichText { text, .. }
             if start < end && end <= text.len()
                 && text.is_char_boundary(start) && text.is_char_boundary(end))
