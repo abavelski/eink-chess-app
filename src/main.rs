@@ -1154,9 +1154,7 @@ impl KoboApp for ChessBoardApp {
             let target = self
                 .analysis_pages()
                 .get(self.analysis_browser.page())
-                .and_then(|page| {
-                    page.target_for_action(action, self.analysis_browser.epoch())
-                });
+                .and_then(|page| page.target_for_action(action, self.analysis_browser.epoch()));
             if let Some(target) = target {
                 if self.select_analysis_node(target) {
                     self.show(context);
@@ -2089,7 +2087,10 @@ mod tests {
         while runner.app().analysis_browser.page() < target_page {
             runner.action(action_id(ANALYSIS_NEXT));
         }
-        runner.action(action_id(&link_action(runner.app().analysis_browser.epoch(), run_index)));
+        runner.action(action_id(&link_action(
+            runner.app().analysis_browser.epoch(),
+            run_index,
+        )));
         assert_eq!(runner.app().analysis_browser.selected_node(), Some(target));
         assert!(runner.app().screen().nodes.iter().any(|node| matches!(
             node, kobo_sdk::Node::RichText { spans, .. }
@@ -3416,8 +3417,12 @@ mod tests {
             .enumerate()
             .filter_map(|(run, text)| text.target.map(|node| (run, text.origin, node)))
             .collect();
-        assert!(targets.iter().any(|(_, origin, _)| *origin == RunOrigin::TreeMove));
-        assert!(targets.iter().any(|(_, origin, _)| *origin == RunOrigin::ExplicitMoveRef));
+        assert!(targets
+            .iter()
+            .any(|(_, origin, _)| *origin == RunOrigin::TreeMove));
+        assert!(targets
+            .iter()
+            .any(|(_, origin, _)| *origin == RunOrigin::ExplicitMoveRef));
         assert!(targets.len() > 7);
         assert!(pages.len() > 3);
 
@@ -3426,13 +3431,18 @@ mod tests {
         let mut ids = Vec::new();
         for &(run, origin, node) in &targets {
             let action = action_id(&link_action(epoch, run));
-            assert!(!ids.contains(&action), "different runs must have different IDs");
+            assert!(
+                !ids.contains(&action),
+                "different runs must have different IDs"
+            );
             ids.push(action);
             let page = pages
                 .iter()
-                .position(|page| page.fragments.iter().any(|part| {
-                    part.source_run == run && part.target == Some(node)
-                }))
+                .position(|page| {
+                    page.fragments
+                        .iter()
+                        .any(|part| part.source_run == run && part.target == Some(node))
+                })
                 .unwrap();
             while runner.app().analysis_browser.page() < page {
                 assert_no_progress_write(&runner.action(action_id(ANALYSIS_NEXT)));
@@ -3446,18 +3456,22 @@ mod tests {
             let mut expected_range = None;
             for fragment in &pages[page].fragments {
                 if fragment.source_run == run && fragment.target == Some(node) {
-                    expected_range = Some((offset, offset + fragment.text.len(), fragment.text.as_str()));
+                    expected_range =
+                        Some((offset, offset + fragment.text.len(), fragment.text.as_str()));
                 }
                 offset += fragment.text.len();
             }
             let (start, end, label) = expected_range.unwrap();
-            assert!(screen.nodes.iter().any(|entry| matches!(
-                entry,
-                kobo_sdk::Node::RichText { text, links, .. }
-                if &text[start..end] == label && links.iter().any(|link| {
-                    link.action == action && link.start == start && link.end == end
-                })
-            )), "missing exact range for {origin:?} run {run}");
+            assert!(
+                screen.nodes.iter().any(|entry| matches!(
+                    entry,
+                    kobo_sdk::Node::RichText { text, links, .. }
+                    if &text[start..end] == label && links.iter().any(|link| {
+                        link.action == action && link.start == start && link.end == end
+                    })
+                )),
+                "missing exact range for {origin:?} run {run}"
+            );
             let fen = runner.app().puzzles[0]
                 .analysis
                 .as_ref()
@@ -3468,8 +3482,14 @@ mod tests {
                 .to_owned();
             assert_no_progress_write(&runner.action(action));
             assert_eq!(runner.app().analysis_browser.selected_node(), Some(node));
-            assert_eq!(runner.app().analysis_browser.preview_fen(), Some(fen.as_str()));
-            assert_eq!(runner.app().displayed_board(), &Board::from_fen(&fen).unwrap());
+            assert_eq!(
+                runner.app().analysis_browser.preview_fen(),
+                Some(fen.as_str())
+            );
+            assert_eq!(
+                runner.app().displayed_board(),
+                &Board::from_fen(&fen).unwrap()
+            );
             assert_eq!(attempt_snapshot(runner.app()), before);
         }
         // Both a repeated prose label and a repeated tree SAN must have
@@ -3486,13 +3506,25 @@ mod tests {
         assert_no_progress_write(&runner.action(action_id(FLIP)));
         assert_eq!(attempt_snapshot(runner.app()), before);
         let (first_run, _, first_node) = targets[0];
-        let first_page = pages.iter().position(|page| page.fragments.iter()
-            .any(|fragment| fragment.source_run == first_run && fragment.target.is_some())).unwrap();
+        let first_page = pages
+            .iter()
+            .position(|page| {
+                page.fragments
+                    .iter()
+                    .any(|fragment| fragment.source_run == first_run && fragment.target.is_some())
+            })
+            .unwrap();
         while runner.app().analysis_browser.page() > first_page {
             assert_no_progress_write(&runner.page_turn(false));
         }
         assert_no_progress_write(&runner.action(action_id(&link_action(epoch, first_run))));
-        let expected = runner.app().puzzles[0].analysis.as_ref().unwrap().node(first_node).unwrap().fen();
+        let expected = runner.app().puzzles[0]
+            .analysis
+            .as_ref()
+            .unwrap()
+            .node(first_node)
+            .unwrap()
+            .fen();
         assert_eq!(runner.app().analysis_browser.preview_fen(), Some(expected));
         assert_eq!(attempt_snapshot(runner.app()), before);
         assert_no_progress_write(&runner.action(action_id(ANALYSIS_CLOSE)));
@@ -3506,9 +3538,20 @@ mod tests {
         let document = project_analysis(&runner.app().puzzles[0]);
         let pages = paginate(&document);
         let before = attempt_snapshot(runner.app());
-        let first = pages[0].fragments.iter().find(|part| part.target.is_some()).unwrap();
-        let last_page = pages.iter().rposition(|page| page.link_count() > 0).unwrap();
-        let last = pages[last_page].fragments.iter().find(|part| part.target.is_some()).unwrap();
+        let first = pages[0]
+            .fragments
+            .iter()
+            .find(|part| part.target.is_some())
+            .unwrap();
+        let last_page = pages
+            .iter()
+            .rposition(|page| page.link_count() > 0)
+            .unwrap();
+        let last = pages[last_page]
+            .fragments
+            .iter()
+            .find(|part| part.target.is_some())
+            .unwrap();
         assert!(last_page > 0);
         assert_ne!(first.source_run, last.source_run);
         assert_no_progress_write(&runner.action(action_id(ANALYSIS_TOGGLE)));
@@ -3557,25 +3600,43 @@ mod tests {
 
     #[test]
     fn analysis_link_ids_never_overlap_other_live_controls() {
-        let puzzle = parse_puzzle_file(&rich_with_duplicate_refs_and_nested_variations()).unwrap().puzzles.remove(0);
-        let links: Vec<_> = project_analysis(&puzzle).runs.iter().enumerate()
+        let puzzle = parse_puzzle_file(&rich_with_duplicate_refs_and_nested_variations())
+            .unwrap()
+            .puzzles
+            .remove(0);
+        let links: Vec<_> = project_analysis(&puzzle)
+            .runs
+            .iter()
+            .enumerate()
             .filter_map(|(index, run)| run.target.map(|_| action_id(&link_action(1, index))))
             .collect();
         let mut other = vec![
-            action_id(ANALYSIS_TOGGLE), action_id(ANALYSIS_PREVIOUS), action_id(ANALYSIS_NEXT),
-            action_id(ANALYSIS_CLOSE), action_id(RESET), action_id(FLIP), action_id(EXIT),
-            action_id(MODE_TOGGLE), action_id(ORIENTATION_LOCK), action_id(PUZZLE_PICKER),
-            action_id(PUZZLE_PICKER_CANCEL), action_id(PROMOTE_QUEEN),
-            action_id(PROMOTE_ROOK), action_id(PROMOTE_BISHOP),
-            action_id(PROMOTE_KNIGHT), action_id(PROMOTION_CANCEL),
+            action_id(ANALYSIS_TOGGLE),
+            action_id(ANALYSIS_PREVIOUS),
+            action_id(ANALYSIS_NEXT),
+            action_id(ANALYSIS_CLOSE),
+            action_id(RESET),
+            action_id(FLIP),
+            action_id(EXIT),
+            action_id(MODE_TOGGLE),
+            action_id(ORIENTATION_LOCK),
+            action_id(PUZZLE_PICKER),
+            action_id(PUZZLE_PICKER_CANCEL),
+            action_id(PROMOTE_QUEEN),
+            action_id(PROMOTE_ROOK),
+            action_id(PROMOTE_BISHOP),
+            action_id(PROMOTE_KNIGHT),
+            action_id(PROMOTION_CANCEL),
         ];
         other.extend((0..CELLS).map(|square| action_id(&square_action(square))));
         other.extend((0..10).map(|index| action_id(&collection_action(index))));
         for link in links {
-            assert!(!other.contains(&link), "analysis action collides with a live control");
+            assert!(
+                !other.contains(&link),
+                "analysis action collides with a live control"
+            );
         }
     }
-
 }
 
 fn main() -> ExitCode {

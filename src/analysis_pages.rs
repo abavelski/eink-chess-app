@@ -2,8 +2,8 @@
 //! Cobalt silently caps a paragraph at 16 links and 256 style spans.
 
 use crate::analysis::NodeHandle;
-use kobo_sdk::{action_id, ActionId};
 use crate::pgn_projection::{AnalysisDocument, RunOrigin};
+use kobo_sdk::{action_id, ActionId};
 
 // Intentionally conservative: the full-size chessboard is never resized.
 pub const PAGE_CHARS: usize = 32;
@@ -285,7 +285,11 @@ mod tests {
         let action = action_id(&link_action(17, visible.source_run));
         let index = pages
             .iter()
-            .position(|page| page.fragments.iter().any(|f| f.source_run == visible.source_run && f.target.is_some()))
+            .position(|page| {
+                page.fragments
+                    .iter()
+                    .any(|f| f.source_run == visible.source_run && f.target.is_some())
+            })
             .unwrap();
         assert_eq!(pages[index].target_for_action(action, 17), visible.target);
         assert_eq!(pages[index].target_for_action(action, 18), None);
@@ -294,7 +298,10 @@ mod tests {
                 assert_eq!(page.target_for_action(action, 17), None);
             }
         }
-        assert_eq!(pages[index].target_for_action(action_id("analysis-link-invalid"), 17), None);
+        assert_eq!(
+            pages[index].target_for_action(action_id("analysis-link-invalid"), 17),
+            None
+        );
     }
 
     #[test]
