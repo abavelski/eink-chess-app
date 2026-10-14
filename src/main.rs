@@ -1,5 +1,6 @@
 mod analysis;
 mod analysis_browser;
+mod analysis_pages;
 mod board;
 mod large_collection;
 mod pgn_projection;
@@ -9,13 +10,16 @@ mod puzzle;
 
 use analysis::NodeHandle;
 use analysis_browser::AnalysisBrowser;
+use analysis_pages::{link_action, paginate, AnalysisPage};
 use board::{Board, Color, Piece, PieceKind, TapResult};
 use kobo_sdk::{
-    action_id, ActionId, BandAlign, BannerLevel, Context, Glyph, KoboApp, Screen, ScreenBuilder,
-    SlotWidth, StoreResult,
+    action_id, ActionId, BandAlign, BannerLevel, Context, ControlState, Glyph, KoboApp,
+    ParagraphPresentation, RichTextSpan, Screen, ScreenBuilder, SlotWidth, StoreResult,
+    TextPresentation,
 };
 use large_collection::{CollectionReader, ReadMode, ReadProgress};
-use presentation::{solution_text, StatusMode};
+use pgn_projection::project_analysis;
+use presentation::{analysis_text, solution_text, StatusMode};
 use progress::Progress;
 use puzzle::{parse_puzzle_file, Puzzle, PuzzleCollection};
 use std::{collections::VecDeque, process::ExitCode};
@@ -28,8 +32,10 @@ const EXIT: &str = "exit";
 const MODE_TOGGLE: &str = "mode-toggle";
 const ORIENTATION_LOCK: &str = "orientation-lock";
 const PUZZLE_PICKER: &str = "puzzle-picker";
-// The visible reader control and paginated actions are added in Task 06.
 const ANALYSIS_TOGGLE: &str = "analysis-toggle";
+const ANALYSIS_PREVIOUS: &str = "analysis-previous";
+const ANALYSIS_NEXT: &str = "analysis-next";
+const ANALYSIS_CLOSE: &str = "analysis-close";
 const PUZZLE_PICKER_CANCEL: &str = "puzzle-picker-cancel";
 const COLLECTION_ACTION_PREFIX: &str = "collection-";
 const PROMOTE_QUEEN: &str = "promote-queen";
@@ -359,7 +365,7 @@ impl ChessBoardApp {
         self.pending_promotion = None;
     }
 
-    /// Accessed by the future Kobo Analysis UI and by host-only state tests.
+    /// The reader is independent of the solve position and progress.
     /// The reader never owns or changes the solving board.
     fn open_analysis(&mut self) -> bool {
         if self.mode != BoardMode::Solution
@@ -394,12 +400,52 @@ impl ChessBoardApp {
         self.analysis_browser.select(tree, node)
     }
 
-    /// The page count is supplied by the future text projection/paginator.
+    /// Page count comes from the same projection used by the visible pane.
     fn turn_analysis_page(&mut self, forward: bool, page_count: usize) -> bool {
         if self.pending_promotion.is_some() || self.picker_open || self.sleeping {
             return false;
         }
         self.analysis_browser.turn_page(forward, page_count)
+    }
+
+    fn analysis_pages(&self) -> Vec<AnalysisPage> {
+        self.puzzles
+            .get(self.puzzle_index)
+            .map(|puzzle| paginate(&project_analysis(puzzle)))
+            .unwrap_or_default()
+    }
+
+    fn analysis_available(&self) -> bool {
+        self.mode == BoardMode::Solution
+            && self.puzzles.get(self.puzzle_index)
+                .is_some_and(|puzzle| analysis_text(puzzle).available())
+    }
+
+    fn analysis_page(screen: ScreenBuilder, page: &AnalysisPage, selected: Option<NodeHandle>) -> ScreenBuilder {
+        let mut text = String::new();
+        let mut spans = Vec::new();
+        let mut links = Vec::new();
+        for fragment in &page.fragments {
+            let start = text.len();
+            text.push_str(&fragment.text);
+            if let Some(target) = fragment.target {
+                let end = text.len();
+                spans.push(RichTextSpan {
+                    start,
+                    end,
+                    presentation: TextPresentation {
+                        strong: true,
+                        underline: true,
+                        highlighted: selected == Some(target),
+                        ..TextPresentation::default()
+                    },
+                });
+                links.push((link_action(fragment.source_run), start, end));
+            }
+        }
+        // PAGE_LINKS (3) is below SDK MAX_TEXT_LINKS (16); styling one
+        // span per link also stays well below MAX_RICH_TEXT_SPANS (256).
+        screen.rich_text_linking(text, spans, ParagraphPresentation::default(), links)
     }
 
     fn displayed_board(&self) -> &Board {
@@ -605,6 +651,8 @@ impl ChessBoardApp {
         };
         let free_board = self.mode == BoardMode::FreeBoard;
         let orientation_locked = self.orientation_locked;
+        let analysis_open = self.analysis_browser.is_open();
+        let analysis_available = self.analysis_available();
         let mut screen = ScreenBuilder::new("chessboard")
             .top_bar(title)
             .top_bar_glyph(EXIT, "Return to Kobo reader", Glyph::Close)
@@ -619,7 +667,29 @@ impl ChessBoardApp {
                             as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>,
                     ),
                     (
-                        // Four 10 mm targets with three 1 mm gaps. Analysis replaces NOTE in Task 06.
+                        // Always visible alongside the four original controls.
+                        // No NOTE, alternate board, review tab or settings page.
+                        SlotWidth::Fixed(130),
+                        Box::new(move |slot| {
+                            if analysis_available {
+                                slot.controls_with_selection(
+                                    1,
+                                    [(
+                                        ANALYSIS_TOGGLE,
+                                        if analysis_open { "Close Analysis" } else { "Open Analysis" },
+                                        Glyph::Book,
+                                        analysis_open,
+                                    )],
+                                )
+                            } else {
+                                slot.button_with_state(
+                                    ANALYSIS_TOGGLE, "Analysis", ControlState::Disabled
+                                )
+                            }
+                        }),
+                    ),
+                    (
+                        // Four original 10 mm controls and right alignment.
                         SlotWidth::Fixed(430),
                         Box::new(move |slot| {
                             slot.controls_with_selection(
@@ -653,9 +723,42 @@ impl ChessBoardApp {
                 self.current_is_solved(),
                 self.description_visible,
             );
-            screen = screen.secondary(view.status);
-            if let Some(description) = view.revealed_description {
-                screen = screen.text(description);
+            if analysis_open {
+                let pages = self.analysis_pages();
+                let page = self.analysis_browser.page().min(pages.len().saturating_sub(1));
+                screen = screen.secondary(format!("Analysis  {}/{}", page + 1, pages.len()));
+                if let Some(content) = pages.get(page) {
+                    screen = Self::analysis_page(
+                        screen, content, self.analysis_browser.selected_node()
+                    );
+                }
+                let has_previous = page > 0;
+                let has_next = page + 1 < pages.len();
+                screen = screen.band(
+                    BandAlign::Middle,
+                    [
+                        (SlotWidth::Fill, Box::new(move |slot: ScreenBuilder| {
+                            slot.button_with_state(
+                                ANALYSIS_PREVIOUS, "Previous",
+                                if has_previous { ControlState::Enabled } else { ControlState::Disabled },
+                            )
+                        }) as Box<dyn FnOnce(ScreenBuilder) -> ScreenBuilder>),
+                        (SlotWidth::Fill, Box::new(|slot: ScreenBuilder| {
+                            slot.button(ANALYSIS_CLOSE, "Close")
+                        })),
+                        (SlotWidth::Fill, Box::new(move |slot: ScreenBuilder| {
+                            slot.button_with_state(
+                                ANALYSIS_NEXT, "Next",
+                                if has_next { ControlState::Enabled } else { ControlState::Disabled },
+                            )
+                        })),
+                    ],
+                );
+            } else {
+                screen = screen.secondary(view.status);
+                if let Some(description) = view.revealed_description {
+                    screen = screen.text(description);
+                }
             }
         }
         if let Some(error) = self.file_error.as_ref() {
@@ -1011,6 +1114,34 @@ impl KoboApp for ChessBoardApp {
             return;
         }
 
+        if self.analysis_browser.is_open() {
+            if action == action_id(ANALYSIS_CLOSE) {
+                self.close_analysis();
+                self.show(context);
+                return;
+            }
+            if action == action_id(ANALYSIS_PREVIOUS) || action == action_id(ANALYSIS_NEXT) {
+                let count = self.analysis_pages().len();
+                if self.turn_analysis_page(action == action_id(ANALYSIS_NEXT), count) {
+                    self.show(context);
+                }
+                return;
+            }
+            if let Some(puzzle) = self.puzzles.get(self.puzzle_index) {
+                let document = project_analysis(puzzle);
+                for (index, run) in document.runs.iter().enumerate() {
+                    if let Some(target) = run.target {
+                        if action == action_id(&link_action(index)) {
+                            if self.select_analysis_node(target) {
+                                self.show(context);
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         if action == action_id(ANALYSIS_TOGGLE) {
             if !self.close_analysis() {
                 self.open_analysis();
@@ -1079,9 +1210,7 @@ impl KoboApp for ChessBoardApp {
             return;
         }
         if self.analysis_browser.is_open() {
-            // Task 06 provides the real page count from its text paginator.
-            // Until then page-turn cannot accidentally navigate to another puzzle.
-            if self.turn_analysis_page(forward, 1) {
+            if self.turn_analysis_page(forward, self.analysis_pages().len()) {
                 self.show(context);
             }
         } else {
@@ -1767,6 +1896,135 @@ mod tests {
         play(&mut runner, "e6f7");
         runner.page_turn(true);
         assert!(!has_description(runner.app()));
+    }
+
+
+    #[test]
+    fn visible_analysis_has_selected_state_and_preserves_the_original_board() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        let metrics = runner.context().metrics();
+        let before = runner.app().screen().diagnostics(&metrics, &Chrome::measuring(false));
+        let old_board = before.layout.nodes.iter()
+            .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+            .unwrap().rect;
+        for name in [ANALYSIS_TOGGLE, MODE_TOGGLE, ORIENTATION_LOCK, RESET, FLIP] {
+            assert!(before.layout.nodes.iter().any(|node| node.kind.acts_on() == Some(action_id(name))));
+        }
+        assert!(!before.layout.nodes.iter().any(|node| {
+            node.kind.acts_on() == Some(action_id("description-toggle"))
+        }));
+        runner.action(action_id(ANALYSIS_TOGGLE));
+        assert!(runner.app().analysis_browser.is_open());
+        let opened = runner.app().screen();
+        let layout = opened.diagnostics(&metrics, &Chrome::measuring(false));
+        assert_eq!(layout.layout.nodes.iter()
+            .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+            .unwrap().rect, old_board);
+        assert!(layout.layout.nodes.iter().any(|node| matches!(
+            node.kind, kobo_sdk::LayoutKind::Cell(id, _, true) if id == action_id(ANALYSIS_TOGGLE)
+        )));
+        assert!(opened.nodes.iter().any(|node| matches!(node, kobo_sdk::Node::RichText { .. })));
+        for name in [ANALYSIS_PREVIOUS, ANALYSIS_NEXT, ANALYSIS_CLOSE] {
+            assert!(layout.layout.nodes.iter().any(|node| node.kind.acts_on() == Some(action_id(name))));
+        }
+        runner.action(action_id(ANALYSIS_CLOSE));
+        assert!(!runner.app().analysis_browser.is_open());
+        let closed = runner.app().screen().diagnostics(&metrics, &Chrome::measuring(false));
+        assert_eq!(closed.layout.nodes.iter()
+            .find(|node| matches!(node.kind, kobo_sdk::LayoutKind::ChessFrame { .. }))
+            .unwrap().rect, old_board);
+        assert!(closed.layout.nodes.iter().any(|node| matches!(
+            node.kind, kobo_sdk::LayoutKind::Cell(id, _, false) if id == action_id(ANALYSIS_TOGGLE)
+        )));
+    }
+
+    #[test]
+    fn blank_analysis_is_disabled_and_legacy_description_has_its_own_pane() {
+        let (mut runner, _) = runner(Some(EXAMPLE_PUZZLES.to_vec()));
+        runner.app_mut().puzzles[0].analysis = None;
+        runner.app_mut().puzzles[0].description = None;
+        runner.app_mut().puzzles[0].description_content.clear();
+        let d = runner.app().screen().diagnostics(&runner.context().metrics(), &Chrome::measuring(false));
+        assert!(d.layout.nodes.iter().any(|node| matches!(
+            node.kind, kobo_sdk::LayoutKind::Button(id, ControlState::Disabled, _)
+            if id == action_id(ANALYSIS_TOGGLE)
+        )));
+        runner.action(action_id(ANALYSIS_TOGGLE));
+        assert!(!runner.app().analysis_browser.is_open());
+        runner.app_mut().puzzles[0].description_content =
+            vec![crate::analysis::ContentSpan::Text("Legacy description".into())];
+        runner.action(action_id(ANALYSIS_TOGGLE));
+        assert!(runner.app().analysis_browser.is_open());
+        assert!(runner.app().analysis_browser.preview_board().is_none());
+        assert!(runner.app().screen().nodes.iter().any(|node| matches!(
+            node, kobo_sdk::Node::RichText { text, .. } if text.contains("Legacy description")
+        )));
+        runner.action(action_id(ANALYSIS_CLOSE));
+        assert!(!runner.app().analysis_browser.is_open());
+    }
+
+    #[test]
+    fn rich_first_middle_last_pages_have_bounded_links_and_do_not_grade_moves() {
+        let (mut runner, _) = runner(Some(RICH_PUZZLES.to_vec()));
+        let before = attempt_snapshot(runner.app());
+        let document = project_analysis(&runner.app().puzzles[0]);
+        let pages = paginate(&document);
+        runner.action(action_id(ANALYSIS_TOGGLE));
+        assert!(runner.app().analysis_browser.is_open());
+        let metrics = runner.context().metrics();
+        let libra_h2o = DisplayMetrics {
+            width: 1080,
+            height: 1440,
+            pixels_per_inch: 265,
+            ..DisplayMetrics::default()
+        };
+        for destination in [0, pages.len() / 2, pages.len() - 1] {
+            while runner.app().analysis_browser.page() < destination {
+                runner.action(action_id(ANALYSIS_NEXT));
+            }
+            while runner.app().analysis_browser.page() > destination {
+                runner.action(action_id(ANALYSIS_PREVIOUS));
+            }
+            let screen = runner.app().screen();
+            for metrics in [metrics, libra_h2o] {
+                let diagnostics = screen.diagnostics(&metrics, &Chrome::measuring(false));
+                assert!(!diagnostics.has_errors(), "page {destination}, {metrics:?}: {:?}", diagnostics.issues);
+            }
+            assert!(screen.nodes.len() <= 512);
+            for node in &screen.nodes {
+                if let kobo_sdk::Node::RichText { spans, links, .. } = node {
+                    assert!(spans.len() <= 256 && links.len() <= 16);
+                    if let Some(link) = links.first() {
+                        assert!(node_as_rich_text_has_utf8_boundaries(node, link.start, link.end));
+                    }
+                }
+            }
+        }
+        let (run_index, target) = document.runs.iter().enumerate()
+            .find_map(|(index, run)| run.target.map(|target| (index, target))).unwrap();
+        let target_page = pages.iter().position(|page| page.fragments.iter().any(|fragment| {
+            fragment.source_run == run_index && fragment.target == Some(target)
+        })).unwrap();
+        while runner.app().analysis_browser.page() > target_page {
+            runner.action(action_id(ANALYSIS_PREVIOUS));
+        }
+        while runner.app().analysis_browser.page() < target_page {
+            runner.action(action_id(ANALYSIS_NEXT));
+        }
+        runner.action(action_id(&link_action(run_index)));
+        assert_eq!(runner.app().analysis_browser.selected_node(), Some(target));
+        assert!(runner.app().screen().nodes.iter().any(|node| matches!(
+            node, kobo_sdk::Node::RichText { spans, .. }
+                if spans.iter().any(|span| span.presentation.highlighted)
+        )));
+        runner.action(action_id(ANALYSIS_CLOSE));
+        assert_eq!(attempt_snapshot(runner.app()), before);
+    }
+
+    fn node_as_rich_text_has_utf8_boundaries(node: &kobo_sdk::Node, start: usize, end: usize) -> bool {
+        matches!(node, kobo_sdk::Node::RichText { text, .. }
+            if start < end && end <= text.len()
+                && text.is_char_boundary(start) && text.is_char_boundary(end))
     }
 
     #[test]
