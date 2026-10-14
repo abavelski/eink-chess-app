@@ -139,7 +139,11 @@ fn parity_book_picker_nested_refs_exact_fens_and_main_lines() {
     runner.page_turn(false);
     runner.page_turn(false);
     assert_eq!(runner.app().puzzle_index, 0);
-    ack_progress_save(&mut runner);
+    // Two navigation events may enqueue a second save while the first is
+    // in flight. Drain both acknowledgements before checking solve writes.
+    while runner.app().progress_saving.is_some() {
+        ack_progress_save(&mut runner);
+    }
     let first = play(&mut runner, "e2e4");
     assert_no_progress_write(&first);
     assert_eq!(runner.app().solution_ply, 2);
