@@ -272,7 +272,10 @@ mod tests {
             .unwrap()
     }
 
-    fn linked(document: &AnalysisDocument, tree: &AnalysisTree) -> Vec<(RunOrigin, String, String)> {
+    fn linked(
+        document: &AnalysisDocument,
+        tree: &AnalysisTree,
+    ) -> Vec<(RunOrigin, String, String)> {
         document
             .runs
             .iter()
@@ -348,7 +351,7 @@ mod tests {
         let puzzle = &mut value["puzzles"][1];
         for node in puzzle["analysis"]["nodes"].as_array_mut().unwrap() {
             let fields = node["fen"].as_str().unwrap();
-            let mut parts = fields.split_ascii_whitespace().collect::<Vec<_>>();
+            let parts = fields.split_ascii_whitespace().collect::<Vec<_>>();
             let fullmove = parts[5].parse::<u32>().unwrap() + 36;
             let updated = format!("{} {}", parts[..5].join(" "), fullmove);
             node["fen"] = json!(updated);
@@ -398,12 +401,20 @@ mod tests {
         value["puzzles"][0]["analysis"]["nodes"][1]["nags"] = json!([1, 7, 2, 0, 3, 42, 4, 5, 6]);
         let puzzle = parse(value);
         let document = project_analysis(&puzzle);
-        let move_run = document.runs.iter().find(|run| run.origin == RunOrigin::TreeMove).unwrap();
-        assert_eq!(move_run.text, format!("h1=Q+{}", ["!", "?", "!!", "??", "!?", "?!"].concat()));
+        let move_run = document
+            .runs
+            .iter()
+            .find(|run| run.origin == RunOrigin::TreeMove)
+            .unwrap();
+        assert_eq!(
+            move_run.text,
+            format!("h1=Q+{}", ["!", "?", "!!", "??", "!?", "?!"].concat())
+        );
         assert!(document.text().contains("$7 $0 $42 The queen promotion"));
-        assert!(document.runs.iter().all(|run| {
-            run.origin != RunOrigin::Prose || run.target.is_none()
-        }));
+        assert!(document
+            .runs
+            .iter()
+            .all(|run| { run.origin != RunOrigin::Prose || run.target.is_none() }));
     }
 
     #[test]
@@ -420,7 +431,12 @@ mod tests {
         assert!(text.contains("{author braces}"));
         let tree = puzzle.analysis.as_ref().unwrap();
         let runs = linked(&project_analysis(&puzzle), tree);
-        assert_eq!(runs.iter().filter(|(origin, _, _)| *origin == RunOrigin::TreeMove).count(), 3);
+        assert_eq!(
+            runs.iter()
+                .filter(|(origin, _, _)| *origin == RunOrigin::TreeMove)
+                .count(),
+            3
+        );
     }
 
     #[test]
@@ -452,7 +468,11 @@ mod tests {
         for i in 1..=depth {
             let id = format!("n{i}");
             let parent = format!("n{}", i - 1);
-            let children = if i < depth { vec![format!("n{}", i + 1)] } else { Vec::new() };
+            let children = if i < depth {
+                vec![format!("n{}", i + 1)]
+            } else {
+                Vec::new()
+            };
             nodes.push(json!({
                 "id":id, "parent":parent, "fen":fen, "children":children,
                 "move":{"uci":"g6g7","san":"Qg7#"}, "role":"main"
@@ -463,7 +483,14 @@ mod tests {
             "analysis":{"version":1,"root":"n0","nodes":nodes}
         }]}));
         let document = project_analysis(&puzzle);
-        assert_eq!(document.runs.iter().filter(|r| r.origin == RunOrigin::TreeMove).count(), depth);
+        assert_eq!(
+            document
+                .runs
+                .iter()
+                .filter(|r| r.origin == RunOrigin::TreeMove)
+                .count(),
+            depth
+        );
         assert_eq!(document.text().matches("Qg7#").count(), depth);
 
         let mut wide: Value = serde_json::from_slice(RICH).unwrap();
@@ -473,11 +500,21 @@ mod tests {
             let id = format!("wide{i}");
             node["id"] = json!(id);
             tree["nodes"].as_array_mut().unwrap().push(node);
-            tree["nodes"][0]["children"].as_array_mut().unwrap().push(json!(format!("wide{i}")));
+            tree["nodes"][0]["children"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!(format!("wide{i}")));
         }
         let puzzle = parse(wide);
         let document = project_analysis(&puzzle);
-        assert_eq!(document.runs.iter().filter(|r| r.origin == RunOrigin::TreeMove).count(), 603);
+        assert_eq!(
+            document
+                .runs
+                .iter()
+                .filter(|r| r.origin == RunOrigin::TreeMove)
+                .count(),
+            603
+        );
         assert_eq!(document.text().matches('(').count(), 602);
         assert_eq!(document.text().matches(')').count(), 602);
     }

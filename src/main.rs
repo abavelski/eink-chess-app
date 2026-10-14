@@ -2,8 +2,8 @@ mod analysis;
 mod analysis_browser;
 mod board;
 mod large_collection;
-mod presentation;
 mod pgn_projection;
+mod presentation;
 mod progress;
 mod puzzle;
 
